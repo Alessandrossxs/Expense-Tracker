@@ -4,6 +4,8 @@ A C++ application for managing personal income and expenses, tracking financial 
 
 ## Features
 
+## Features To be implemented 
+
 - Add, edit, and delete transactions
 - Track income and expenses
 - Organize transactions by category
