@@ -1,4 +1,6 @@
 #include "TransactionDialog.h"
+#include "CategoryTranslations.h"
+#include "ComboPopupDelegate.h"
 
 #include <QComboBox>
 #include <QDate>
@@ -21,10 +23,12 @@ TransactionDialog::TransactionDialog(
     setMinimumWidth(380);
 
     m_type = new QComboBox(this);
+    polishComboPopup(m_type);
     m_type->addItem(tr("Uscita"), false);
     m_type->addItem(tr("Entrata"), true);
 
     m_category = new QComboBox(this);
+    polishComboPopup(m_category);
     m_date = new QDateEdit(QDate::currentDate(), this);
     m_date->setCalendarPopup(true);
     m_date->setDisplayFormat(QStringLiteral("dd/MM/yyyy"));
@@ -71,7 +75,8 @@ void TransactionDialog::reloadCategories(int preferredCategory)
         if ((income && type == QStringLiteral("in")) ||
             (!income && type == QStringLiteral("out"))) {
             m_category->addItem(
-                category.value(QStringLiteral("Name")).toString(),
+                translatedCategoryName(
+                    category.value(QStringLiteral("Name")).toString()),
                 category.value(QStringLiteral("ID_Category")).toInt());
         }
     }

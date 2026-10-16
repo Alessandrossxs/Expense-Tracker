@@ -121,6 +121,16 @@ QString transactionType(bool isIncome)
     return isIncome ? QStringLiteral("in") : QStringLiteral("out");
 }
 
+bool isValidAccountType(const QString &type)
+{
+    return type == QStringLiteral("checking") ||
+           type == QStringLiteral("debit_card") ||
+           type == QStringLiteral("credit_card") ||
+           type == QStringLiteral("savings") ||
+           type == QStringLiteral("cash") ||
+           type == QStringLiteral("other");
+}
+
 qint64 signedAmount(qint64 amount, bool isIncome)
 {
     return isIncome ? amount : -amount;
@@ -197,7 +207,8 @@ bool Database::initialize()
             "Name TEXT NOT NULL, "
             "Password_Hash TEXT NOT NULL, "
             "Initial_Credit INTEGER NOT NULL CHECK (Initial_Credit >= 0), "
-            "Credit INTEGER NOT NULL)"),
+            "Credit INTEGER NOT NULL, "
+            "Account_Type TEXT NOT NULL DEFAULT 'checking')"),
         QStringLiteral(
             "CREATE TABLE IF NOT EXISTS Category ("
             "ID_Category INTEGER PRIMARY KEY AUTOINCREMENT, "
@@ -215,6 +226,24 @@ bool Database::initialize()
             "ON UPDATE RESTRICT ON DELETE RESTRICT, "
             "FOREIGN KEY (ID_Account) REFERENCES Bank_Account(ID_Account) "
             "ON UPDATE RESTRICT ON DELETE RESTRICT)"),
+        QStringLiteral(
+            "CREATE TABLE IF NOT EXISTS Account_Transfers ("
+            "ID_Transfer INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "Source_Account INTEGER NOT NULL, "
+            "Destination_Account INTEGER NOT NULL, "
+            "Date TEXT NOT NULL, "
+            "Amount INTEGER NOT NULL CHECK (Amount > 0), "
+            "CHECK (Source_Account != Destination_Account), "
+            "FOREIGN KEY (Source_Account) REFERENCES Bank_Account(ID_Account) "
+            "ON UPDATE RESTRICT ON DELETE RESTRICT, "
+            "FOREIGN KEY (Destination_Account) REFERENCES Bank_Account(ID_Account) "
+            "ON UPDATE RESTRICT ON DELETE RESTRICT)"),
+        QStringLiteral(
+            "CREATE INDEX IF NOT EXISTS idx_transfers_source_date "
+            "ON Account_Transfers(Source_Account, Date, ID_Transfer)"),
+        QStringLiteral(
+            "CREATE INDEX IF NOT EXISTS idx_transfers_destination_date "
+            "ON Account_Transfers(Destination_Account, Date, ID_Transfer)"),
         QStringLiteral(
             "CREATE INDEX IF NOT EXISTS idx_transactions_account_date "
             "ON Transactions(ID_Account, Date, ID_Transaction)"),
@@ -236,6 +265,25 @@ bool Database::initialize()
         if (!execute(statement)) {
             return rollbackWithError(m_db, m_lastError);
         }
+    }
+    QSqlQuery accountColumns(m_db);
+    if (!accountColumns.exec(QStringLiteral("PRAGMA table_info(Bank_Account)"))) {
+        setQueryError(m_lastError, QStringLiteral("Failed to inspect account schema"), accountColumns);
+        return rollbackWithError(m_db, m_lastError);
+    }
+    bool hasAccountType = false;
+    while (accountColumns.next()) {
+        if (accountColumns.value(1).toString() == QStringLiteral("Account_Type")) {
+            hasAccountType = true;
+            break;
+        }
+    }
+    accountColumns.finish();
+    if (!hasAccountType &&
+        !execute(QStringLiteral(
+            "ALTER TABLE Bank_Account ADD COLUMN Account_Type TEXT NOT NULL "
+            "DEFAULT 'checking'"))) {
+        return rollbackWithError(m_db, m_lastError);
     }
     if (!m_db.commit()) {
         m_lastError = QStringLiteral("Failed to commit schema transaction: ") +
@@ -260,15 +308,17 @@ bool Database::addAccount(
     const QString &passwordHash,
     const QString &creationDate,
     qint64 initialCredit,
-    int *newId)
+    int *newId,
+    const QString &accountType)
 {
     m_lastError.clear();
     if (!isOpen()) {
         m_lastError = QStringLiteral("Database is not open");
         return false;
     }
-    if (name.trimmed().isEmpty() || passwordHash.isEmpty()) {
-        m_lastError = QStringLiteral("Account name and password hash are required");
+    if (name.trimmed().isEmpty() || passwordHash.isEmpty() ||
+        !isValidAccountType(accountType)) {
+        m_lastError = QStringLiteral("Account name, password hash, and valid account type are required");
         return false;
     }
     if (!isValidIsoDate(creationDate)) {
@@ -289,13 +339,14 @@ bool Database::addAccount(
     query.prepare(
         QStringLiteral(
             "INSERT INTO Bank_Account "
-            "(Creation_date, Name, Password_Hash, Initial_Credit, Credit) "
-            "VALUES (?, ?, ?, ?, ?)"));
+            "(Creation_date, Name, Password_Hash, Initial_Credit, Credit, Account_Type) "
+            "VALUES (?, ?, ?, ?, ?, ?)"));
     query.addBindValue(creationDate);
     query.addBindValue(name.trimmed());
     query.addBindValue(passwordHash);
     query.addBindValue(initialCredit);
     query.addBindValue(initialCredit);
+    query.addBindValue(accountType);
     if (!query.exec()) {
         setQueryError(m_lastError, QStringLiteral("Failed to create account"), query);
         return rollbackWithError(m_db, m_lastError);
@@ -314,6 +365,147 @@ bool Database::addAccount(
     }
     if (newId != nullptr) {
         *newId = static_cast<int>(insertedId);
+    }
+    return true;
+}
+
+bool Database::getAccounts(QList<QVariantMap> &accounts)
+{
+    m_lastError.clear();
+    if (!isOpen()) {
+        m_lastError = QStringLiteral("Database is not open");
+        return false;
+    }
+    QSqlQuery query(m_db);
+    if (!query.exec(QStringLiteral(
+            "SELECT ID_Account, Name, Account_Type, Credit, "
+            "(SELECT COUNT(*) FROM Transactions "
+            " WHERE Transactions.ID_Account = Bank_Account.ID_Account), "
+            "(SELECT COUNT(*) FROM Account_Transfers "
+            " WHERE Account_Transfers.Source_Account = Bank_Account.ID_Account "
+            " OR Account_Transfers.Destination_Account = Bank_Account.ID_Account) "
+            "FROM Bank_Account ORDER BY ID_Account"))) {
+        setQueryError(m_lastError, QStringLiteral("Failed to retrieve accounts"), query);
+        return false;
+    }
+    QList<QVariantMap> result;
+    while (query.next()) {
+        QVariantMap account;
+        account.insert(QStringLiteral("ID_Account"), query.value(0));
+        account.insert(QStringLiteral("Name"), query.value(1));
+        account.insert(QStringLiteral("Type"), query.value(2));
+        account.insert(QStringLiteral("Balance"), query.value(3));
+        account.insert(QStringLiteral("TransactionCount"), query.value(4));
+        account.insert(QStringLiteral("TransferCount"), query.value(5));
+        result.append(account);
+    }
+    accounts = result;
+    return true;
+}
+
+bool Database::updateAccount(
+    int accountId,
+    const QString &name,
+    const QString &accountType)
+{
+    m_lastError.clear();
+    if (!isOpen()) {
+        m_lastError = QStringLiteral("Database is not open");
+        return false;
+    }
+    if (accountId <= 0 || name.trimmed().isEmpty() || !isValidAccountType(accountType)) {
+        m_lastError = QStringLiteral("Account ID, name, or type is invalid");
+        return false;
+    }
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "UPDATE Bank_Account SET Name = ?, Account_Type = ? WHERE ID_Account = ?"));
+    query.addBindValue(name.trimmed());
+    query.addBindValue(accountType);
+    query.addBindValue(accountId);
+    if (!query.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to update account"), query);
+        return false;
+    }
+    if (query.numRowsAffected() != 1) {
+        m_lastError = QStringLiteral("Account %1 does not exist").arg(accountId);
+        return false;
+    }
+    return true;
+}
+
+bool Database::deleteAccount(int accountId)
+{
+    m_lastError.clear();
+    if (!isOpen()) {
+        m_lastError = QStringLiteral("Database is not open");
+        return false;
+    }
+    if (accountId <= 0) {
+        m_lastError = QStringLiteral("Account ID must be positive");
+        return false;
+    }
+    if (!m_db.transaction()) {
+        m_lastError = QStringLiteral("Failed to start account deletion: ") +
+                      m_db.lastError().text();
+        return false;
+    }
+    QSqlQuery countQuery(m_db);
+    if (!countQuery.exec(QStringLiteral("SELECT COUNT(*) FROM Bank_Account"))) {
+        setQueryError(m_lastError, QStringLiteral("Failed to count accounts"), countQuery);
+        return rollbackWithError(m_db, m_lastError);
+    }
+    if (!countQuery.next() || countQuery.value(0).toInt() <= 1) {
+        m_lastError = QStringLiteral("The last account cannot be deleted");
+        return rollbackWithError(m_db, m_lastError);
+    }
+    countQuery.finish();
+
+    QSqlQuery usageQuery(m_db);
+    usageQuery.prepare(QStringLiteral(
+        "SELECT "
+        "(SELECT COUNT(*) FROM Transactions WHERE ID_Account = ?), "
+        "(SELECT COUNT(*) FROM Account_Transfers "
+        " WHERE Source_Account = ? OR Destination_Account = ?), "
+        "(SELECT Credit FROM Bank_Account WHERE ID_Account = ?)"));
+    usageQuery.addBindValue(accountId);
+    usageQuery.addBindValue(accountId);
+    usageQuery.addBindValue(accountId);
+    usageQuery.addBindValue(accountId);
+    if (!usageQuery.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to check account history"), usageQuery);
+        return rollbackWithError(m_db, m_lastError);
+    }
+    if (!usageQuery.next()) {
+        m_lastError = QStringLiteral("Failed to inspect account history");
+        return rollbackWithError(m_db, m_lastError);
+    }
+    if (usageQuery.value(0).toLongLong() != 0 ||
+        usageQuery.value(1).toLongLong() != 0 ||
+        usageQuery.value(2).isNull() ||
+        usageQuery.value(2).toLongLong() != 0) {
+        m_lastError = QStringLiteral(
+            "Only an existing account with no activity and a zero balance can be deleted");
+        return rollbackWithError(m_db, m_lastError);
+    }
+    usageQuery.finish();
+
+    QSqlQuery deleteQuery(m_db);
+    deleteQuery.prepare(QStringLiteral(
+        "DELETE FROM Bank_Account WHERE ID_Account = ?"));
+    deleteQuery.addBindValue(accountId);
+    if (!deleteQuery.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to delete account"), deleteQuery);
+        return rollbackWithError(m_db, m_lastError);
+    }
+    if (deleteQuery.numRowsAffected() != 1) {
+        m_lastError = QStringLiteral("Account %1 does not exist").arg(accountId);
+        return rollbackWithError(m_db, m_lastError);
+    }
+    if (!m_db.commit()) {
+        m_lastError = QStringLiteral("Failed to commit account deletion: ") +
+                      m_db.lastError().text();
+        return rollbackWithError(m_db, m_lastError);
     }
     return true;
 }
@@ -343,6 +535,96 @@ bool Database::getAccountBalance(int accountId, qint64 &balance)
         return false;
     }
     balance = query.value(0).toLongLong();
+    return true;
+}
+
+bool Database::addTransfer(
+    int sourceAccountId,
+    int destinationAccountId,
+    const QString &date,
+    qint64 amount)
+{
+    m_lastError.clear();
+    if (!isOpen()) {
+        m_lastError = QStringLiteral("Database is not open");
+        return false;
+    }
+    if (sourceAccountId <= 0 || destinationAccountId <= 0 ||
+        sourceAccountId == destinationAccountId || amount <= 0 ||
+        !isValidIsoDate(date)) {
+        m_lastError = QStringLiteral("Transfer accounts, date, and amount are invalid");
+        return false;
+    }
+    if (!m_db.transaction()) {
+        m_lastError = QStringLiteral("Failed to start transfer: ") + m_db.lastError().text();
+        return false;
+    }
+    QSqlQuery insertQuery(m_db);
+    insertQuery.prepare(QStringLiteral(
+        "INSERT INTO Account_Transfers "
+        "(Source_Account, Destination_Account, Date, Amount) VALUES (?, ?, ?, ?)"));
+    insertQuery.addBindValue(sourceAccountId);
+    insertQuery.addBindValue(destinationAccountId);
+    insertQuery.addBindValue(date);
+    insertQuery.addBindValue(amount);
+    if (!insertQuery.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to create transfer"), insertQuery);
+        return rollbackWithError(m_db, m_lastError);
+    }
+    insertQuery.finish();
+    if (!adjustAccountBalance(m_db, sourceAccountId, -amount, m_lastError) ||
+        !adjustAccountBalance(m_db, destinationAccountId, amount, m_lastError)) {
+        return rollbackWithError(m_db, m_lastError);
+    }
+    if (!m_db.commit()) {
+        m_lastError = QStringLiteral("Failed to commit transfer: ") + m_db.lastError().text();
+        return rollbackWithError(m_db, m_lastError);
+    }
+    return true;
+}
+
+bool Database::getAccountTransfers(int accountId, QList<QVariantMap> &transfers)
+{
+    m_lastError.clear();
+    if (!isOpen()) {
+        m_lastError = QStringLiteral("Database is not open");
+        return false;
+    }
+    if (accountId <= 0) {
+        m_lastError = QStringLiteral("Account ID must be positive");
+        return false;
+    }
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "SELECT t.ID_Transfer, t.Date, t.Amount, t.Source_Account, "
+        "source.Name, destination.Name, "
+        "CASE WHEN t.Source_Account = ? THEN 'out' ELSE 'in' END "
+        "FROM Account_Transfers t "
+        "JOIN Bank_Account source ON source.ID_Account = t.Source_Account "
+        "JOIN Bank_Account destination ON destination.ID_Account = t.Destination_Account "
+        "WHERE t.Source_Account = ? OR t.Destination_Account = ? "
+        "ORDER BY t.Date DESC, t.ID_Transfer DESC"));
+    query.addBindValue(accountId);
+    query.addBindValue(accountId);
+    query.addBindValue(accountId);
+    if (!query.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to retrieve transfers"), query);
+        return false;
+    }
+    QList<QVariantMap> result;
+    while (query.next()) {
+        const bool outgoing = query.value(6).toString() == QStringLiteral("out");
+        QVariantMap transfer;
+        transfer.insert(QStringLiteral("ID_Transfer"), query.value(0));
+        transfer.insert(QStringLiteral("Date"), query.value(1));
+        transfer.insert(QStringLiteral("Amount"), query.value(2));
+        transfer.insert(QStringLiteral("Direction"), outgoing
+                            ? QStringLiteral("out")
+                            : QStringLiteral("in"));
+        transfer.insert(QStringLiteral("OtherAccount"), query.value(outgoing ? 5 : 4));
+        result.append(transfer);
+    }
+    transfers = result;
     return true;
 }
 
@@ -633,6 +915,12 @@ bool Database::getTransactions(
         m_lastError = QStringLiteral("Category filter ID cannot be negative");
         return false;
     }
+    if (!filter.type.isEmpty() &&
+        filter.type != QStringLiteral("in") &&
+        filter.type != QStringLiteral("out")) {
+        m_lastError = QStringLiteral("Transaction type filter must be 'in' or 'out'");
+        return false;
+    }
     if (filter.minimumAmount < 0 || filter.maximumAmount < 0 ||
         (filter.maximumAmount != 0 && filter.minimumAmount > filter.maximumAmount)) {
         m_lastError = QStringLiteral("Transaction amount filter range is invalid");
@@ -648,6 +936,9 @@ bool Database::getTransactions(
     }
     if (!filter.dateTo.isEmpty()) {
         sql += QStringLiteral(" AND Date <= ?");
+    }
+    if (!filter.type.isEmpty()) {
+        sql += QStringLiteral(" AND Type = ?");
     }
     if (filter.categoryId > 0) {
         sql += QStringLiteral(" AND ID_Category = ?");
@@ -667,6 +958,9 @@ bool Database::getTransactions(
     }
     if (!filter.dateTo.isEmpty()) {
         query.addBindValue(filter.dateTo);
+    }
+    if (!filter.type.isEmpty()) {
+        query.addBindValue(filter.type);
     }
     if (filter.categoryId > 0) {
         query.addBindValue(filter.categoryId);

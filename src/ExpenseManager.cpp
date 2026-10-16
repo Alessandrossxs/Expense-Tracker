@@ -47,15 +47,50 @@ bool ExpenseManager::addAccount(
     const QString &passwordHash,
     const QString &creationDate,
     qint64 initialCredit,
-    int *newId)
+    int *newId,
+    const QString &accountType)
 {
     return recordResult(
-        m_database.addAccount(name, passwordHash, creationDate, initialCredit, newId));
+        m_database.addAccount(
+            name, passwordHash, creationDate, initialCredit, newId, accountType));
+}
+
+bool ExpenseManager::getAccounts(QList<QVariantMap> &accounts)
+{
+    return recordResult(m_database.getAccounts(accounts));
+}
+
+bool ExpenseManager::updateAccount(
+    int accountId,
+    const QString &name,
+    const QString &accountType)
+{
+    return recordResult(m_database.updateAccount(accountId, name, accountType));
+}
+
+bool ExpenseManager::deleteAccount(int accountId)
+{
+    return recordResult(m_database.deleteAccount(accountId));
 }
 
 bool ExpenseManager::getAccountBalance(int accountId, qint64 &balance)
 {
     return recordResult(m_database.getAccountBalance(accountId, balance));
+}
+
+bool ExpenseManager::addTransfer(
+    int sourceAccountId,
+    int destinationAccountId,
+    const QString &date,
+    qint64 amount)
+{
+    return recordResult(
+        m_database.addTransfer(sourceAccountId, destinationAccountId, date, amount));
+}
+
+bool ExpenseManager::getAccountTransfers(int accountId, QList<QVariantMap> &transfers)
+{
+    return recordResult(m_database.getAccountTransfers(accountId, transfers));
 }
 
 bool ExpenseManager::addCategory(const QString &name, const QString &type, int *newId)
@@ -134,7 +169,7 @@ bool ExpenseManager::exportTransactionsToCsv(
 
     QTextStream stream(&file);
     stream.setEncoding(QStringConverter::Utf8);
-    stream << "transaction_id,account_id,category_id,date,type,amount_cents\r\n";
+    stream << "transaction_id,account_id,category_id,date,type,amount_cents\n";
     for (const Transaction &transaction : transactions) {
         stream << csvField(QString::number(transaction.getId())) << ','
                << csvField(QString::number(transaction.getAccountId())) << ','
@@ -142,7 +177,7 @@ bool ExpenseManager::exportTransactionsToCsv(
                << csvField(transaction.getDate()) << ','
                << csvField(transaction.isIncome() ? QStringLiteral("income")
                                                    : QStringLiteral("expense"))
-               << ',' << csvField(QString::number(transaction.getAmount())) << "\r\n";
+               << ',' << csvField(QString::number(transaction.getAmount())) << '\n';
     }
     stream.flush();
     if (stream.status() != QTextStream::Ok) {

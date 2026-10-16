@@ -5,6 +5,8 @@
 
 #include <QCoreApplication>
 #include <QFile>
+#include <QSqlError>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 #include <iostream>
 #include <limits>
@@ -51,7 +53,8 @@ int main(int argc, char *argv[])
                 QStringLiteral("test-hash"),
                 QStringLiteral("2026-01-01"),
                 500,
-                &secondAccountId),
+                &secondAccountId,
+                QStringLiteral("savings")),
             database.lastError())) {
         return 1;
     }
@@ -120,6 +123,96 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    QList<QVariantMap> accounts;
+    QList<QVariantMap> transfers;
+    if (!expect(database.getAccounts(accounts), database.lastError()) ||
+        !expect(accounts.size() == 2, QStringLiteral("Accounts were not retrieved")) ||
+        !expect(accounts.first().value(QStringLiteral("TransactionCount")).toInt() == 1,
+                QStringLiteral("Account transaction count is incorrect")) ||
+        !expect(accounts.first().value(QStringLiteral("TransferCount")).toInt() == 0,
+                QStringLiteral("Account transfer count is incorrect")) ||
+        !expect(accounts.at(1).value(QStringLiteral("Type")).toString() ==
+                    QStringLiteral("savings"),
+                QStringLiteral("Account type was not saved")) ||
+        !expect(
+            database.addTransfer(
+                firstAccountId, secondAccountId, QStringLiteral("2026-01-06"), 1000),
+            database.lastError()) ||
+        !expect(database.getAccountBalance(firstAccountId, firstBalance), database.lastError()) ||
+        !expect(database.getAccountBalance(secondAccountId, secondBalance), database.lastError()) ||
+        !expect(firstBalance == 11000, QStringLiteral("Transfer did not debit source account")) ||
+        !expect(secondBalance == 1500, QStringLiteral("Transfer did not credit destination account")) ||
+        !expect(database.getAccounts(accounts), database.lastError()) ||
+        !expect(accounts.first().value(QStringLiteral("TransferCount")).toInt() == 1,
+                QStringLiteral("Source account transfer count is incorrect")) ||
+        !expect(accounts.at(1).value(QStringLiteral("TransferCount")).toInt() == 1,
+                QStringLiteral("Destination account transfer count is incorrect")) ||
+        !expect(database.getAccountTransfers(firstAccountId, transfers), database.lastError()) ||
+        !expect(transfers.size() == 1, QStringLiteral("Transfer history was not retrieved")) ||
+        !expect(transfers.first().value(QStringLiteral("Direction")).toString() ==
+                    QStringLiteral("out"),
+                QStringLiteral("Outgoing transfer direction is incorrect")) ||
+        !expect(transfers.first().value(QStringLiteral("OtherAccount")).toString() ==
+                    QStringLiteral("Second account"),
+                QStringLiteral("Transfer destination is incorrect")) ||
+        !expect(database.getTransactions(firstAccountId, transactions), database.lastError()) ||
+        !expect(transactions.size() == 1,
+                QStringLiteral("Internal transfer was counted as an income or expense")) ||
+        !expect(
+            !database.addTransfer(
+                firstAccountId, firstAccountId, QStringLiteral("2026-01-06"), 1000),
+            QStringLiteral("Self-transfer was accepted"))) {
+        return 1;
+    }
+
+    if (!expect(
+            database.updateAccount(
+                secondAccountId,
+                QStringLiteral("Rainy day"),
+                QStringLiteral("savings")),
+            database.lastError()) ||
+        !expect(database.getAccounts(accounts), database.lastError()) ||
+        !expect(accounts.at(1).value(QStringLiteral("Name")).toString() ==
+                    QStringLiteral("Rainy day"),
+                QStringLiteral("Account name was not updated")) ||
+        !expect(
+            !database.updateAccount(
+                secondAccountId, QStringLiteral("Invalid"), QStringLiteral("unknown")),
+            QStringLiteral("Invalid account type was accepted"))) {
+        return 1;
+    }
+
+    int emptyAccountId = 0;
+    int fundedAccountId = 0;
+    if (!expect(
+            database.addAccount(
+                QStringLiteral("Empty account"),
+                QStringLiteral("test-hash"),
+                QStringLiteral("2026-01-07"),
+                0,
+                &emptyAccountId),
+            database.lastError()) ||
+        !expect(
+            database.addAccount(
+                QStringLiteral("Funded account"),
+                QStringLiteral("test-hash"),
+                QStringLiteral("2026-01-07"),
+                500,
+                &fundedAccountId),
+            database.lastError()) ||
+        !expect(
+            !database.deleteAccount(fundedAccountId),
+            QStringLiteral("Account with remaining funds was deleted")) ||
+        !expect(database.deleteAccount(emptyAccountId), database.lastError()) ||
+        !expect(
+            !database.deleteAccount(secondAccountId),
+            QStringLiteral("Account with transfer history was deleted")) ||
+        !expect(
+            !database.deleteAccount(firstAccountId),
+            QStringLiteral("Account with transactions was deleted"))) {
+        return 1;
+    }
+
     const Statistics statistics({income, expense});
     if (!expect(statistics.getTotalIncome() == 2000, QStringLiteral("Income total is incorrect")) ||
         !expect(statistics.getTotalExpenses() == 3000, QStringLiteral("Expense total is incorrect")) ||
@@ -127,7 +220,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    const Statistics emptyStatistics({});
+    const Statistics emptyStatistics(QList<Transaction>{});
     if (!expect(emptyStatistics.getTotalIncome() == 0, QStringLiteral("Empty income total is not zero")) ||
         !expect(emptyStatistics.getTotalExpenses() == 0, QStringLiteral("Empty expense total is not zero")) ||
         !expect(emptyStatistics.getBalance() == 0, QStringLiteral("Empty balance is not zero"))) {
@@ -226,6 +319,7 @@ int main(int argc, char *argv[])
     TransactionFilter filter;
     filter.dateFrom = QStringLiteral("2026-02-03");
     filter.dateTo = QStringLiteral("2026-02-03");
+    filter.type = QStringLiteral("out");
     filter.categoryId = managedExpenseCategoryId;
     filter.minimumAmount = 1000;
     filter.maximumAmount = 2000;
@@ -267,7 +361,7 @@ int main(int argc, char *argv[])
             QStringLiteral("CSV header is incorrect")) ||
         !expect(csvContents.count('\n') == 2, QStringLiteral("CSV export contains unexpected rows")) ||
         !expect(
-            csvContents.contains(QByteArrayLiteral(",expense,\"1500\"\r\n")),
+            csvContents.contains(QByteArrayLiteral(",\"expense\",\"1500\"\r\n")),
             QStringLiteral("CSV row is incorrect"))) {
         return 1;
     }
@@ -279,6 +373,73 @@ int main(int argc, char *argv[])
             !manager.getTransactions(managedAccountId, filteredTransactions, invalidFilter),
             QStringLiteral("Invalid transaction filter was accepted")) ||
         !expect(!manager.lastError().isEmpty(), QStringLiteral("Invalid filter did not report an error"))) {
+        return 1;
+    }
+
+    invalidFilter = TransactionFilter{};
+    invalidFilter.type = QStringLiteral("income");
+    if (!expect(
+            !manager.getTransactions(managedAccountId, filteredTransactions, invalidFilter),
+            QStringLiteral("Invalid transaction type filter was accepted")) ||
+        !expect(!manager.lastError().isEmpty(), QStringLiteral("Invalid type filter did not report an error"))) {
+        return 1;
+    }
+
+    const QString legacyPath =
+        temporaryDirectory.filePath(QStringLiteral("legacy-database.sqlite"));
+    const QString legacyConnection = QStringLiteral("legacy_fixture_connection");
+    {
+        QSqlDatabase legacy = QSqlDatabase::addDatabase(
+            QStringLiteral("QSQLITE"), legacyConnection);
+        legacy.setDatabaseName(legacyPath);
+        if (!expect(legacy.open(), legacy.lastError().text()))
+            return 1;
+        {
+            QSqlQuery query(legacy);
+            if (!expect(query.exec(QStringLiteral(
+                    "CREATE TABLE Bank_Account ("
+                    "ID_Account INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    "Creation_date TEXT NOT NULL, Name TEXT NOT NULL, "
+                    "Password_Hash TEXT NOT NULL, Initial_Credit INTEGER NOT NULL, "
+                    "Credit INTEGER NOT NULL)")), query.lastError().text()) ||
+                !expect(query.exec(QStringLiteral(
+                    "INSERT INTO Bank_Account "
+                    "(Creation_date, Name, Password_Hash, Initial_Credit, Credit) "
+                    "VALUES ('2026-01-01', 'Legacy', 'hash', 1000, 1000)")),
+                    query.lastError().text())) {
+                return 1;
+            }
+        }
+        legacy.close();
+        legacy = QSqlDatabase();
+    }
+    QSqlDatabase::removeDatabase(legacyConnection);
+    Database migratedDatabase(legacyPath);
+    QList<QVariantMap> migratedAccounts;
+    if (!expect(migratedDatabase.open(), migratedDatabase.lastError()) ||
+        !expect(migratedDatabase.getAccounts(migratedAccounts), migratedDatabase.lastError()) ||
+        !expect(migratedAccounts.size() == 1, QStringLiteral("Legacy account was not preserved")) ||
+        !expect(migratedAccounts.first().value(QStringLiteral("Type")).toString() ==
+                    QStringLiteral("checking"),
+                QStringLiteral("Legacy account type default was not applied"))) {
+        return 1;
+    }
+
+    Database singleAccountDatabase(
+        temporaryDirectory.filePath(QStringLiteral("single-account.sqlite")));
+    int singleAccountId = 0;
+    if (!expect(singleAccountDatabase.open(), singleAccountDatabase.lastError()) ||
+        !expect(
+            singleAccountDatabase.addAccount(
+                QStringLiteral("Only account"),
+                QStringLiteral("test-hash"),
+                QStringLiteral("2026-02-01"),
+                0,
+                &singleAccountId),
+            singleAccountDatabase.lastError()) ||
+        !expect(
+            !singleAccountDatabase.deleteAccount(singleAccountId),
+            QStringLiteral("The last remaining account was deleted"))) {
         return 1;
     }
 

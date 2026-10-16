@@ -1,0 +1,63 @@
+#include <QCoreApplication>
+#include <QTranslator>
+#include <QString>
+
+#include <iostream>
+
+namespace
+{
+bool expectEqual(const QString &actual, const QString &expected, const char *message)
+{
+    if (actual == expected)
+        return true;
+
+    std::cerr << message << ": expected \"" << expected.toStdString()
+              << "\", got \"" << actual.toStdString() << "\"\n";
+    return false;
+}
+}
+
+int main(int argc, char *argv[])
+{
+    QCoreApplication application(argc, argv);
+    if (argc != 3) {
+        std::cerr << "Expected English and Italian catalog paths\n";
+        return 1;
+    }
+
+    QTranslator english;
+    if (!english.load(QString::fromLocal8Bit(argv[1])) ||
+        !application.installTranslator(&english)) {
+        std::cerr << "Could not load English translation catalog\n";
+        return 1;
+    }
+    if (!expectEqual(QCoreApplication::translate("MainWindow", "Panoramica"),
+                     QStringLiteral("Dashboard"), "English navigation") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Conto di risparmio"),
+                     QStringLiteral("Savings account"), "English account type") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Trasferimenti tra conti"),
+                     QStringLiteral("Transfers between accounts"), "English transfers") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Gestisci conti"),
+                     QStringLiteral("Manage accounts"), "English account management") ||
+        !expectEqual(QCoreApplication::translate("CategoryNames", "Stipendio"),
+                     QStringLiteral("Salary"), "English category") ||
+        !expectEqual(QCoreApplication::translate("TransactionDialog", "Uscita"),
+                     QStringLiteral("Expense"), "English transaction type")) {
+        return 1;
+    }
+    application.removeTranslator(&english);
+
+    QTranslator italian;
+    if (!italian.load(QString::fromLocal8Bit(argv[2])) ||
+        !application.installTranslator(&italian)) {
+        std::cerr << "Could not load Italian translation catalog\n";
+        return 1;
+    }
+    if (!expectEqual(QCoreApplication::translate("MainWindow", "Reset"),
+                     QStringLiteral("Azzera"), "Italian filter reset") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Date"),
+                     QStringLiteral("Data"), "Italian date filter")) {
+        return 1;
+    }
+    return 0;
+}

@@ -12,6 +12,8 @@ class QDoubleSpinBox;
 
 class TransactionDialog : public QDialog
 {
+    Q_OBJECT
+
 public:
     explicit TransactionDialog(
         const QList<QVariantMap> &categories,

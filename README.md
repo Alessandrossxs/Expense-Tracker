@@ -9,7 +9,11 @@ A C++ application for managing personal income and expenses, tracking financial 
 - Organize transactions by category
 - Filter transactions by date range, category, and amount range
 - Calculate total income, expenses, and current balance
+- Switch between light and dark themes and customize the accent palette
+- Use the interface in Italian or English
 - Store accounts, categories, transactions, and balances in SQLite
+- Track multiple checking, debit-card, credit-card, savings, and cash accounts
+- Transfer money between accounts without counting transfers as income or expenses
 - Export filtered transaction data to CSV
 
 ## Technologies
@@ -25,6 +29,7 @@ ExpenseTracker/
 ├── src/
 ├── include/
 ├── tests/
+├── translations/
 ├── data/
 ├── CMakeLists.txt
 ├── README.md
@@ -35,7 +40,7 @@ ExpenseTracker/
 
 - A C++17-compatible compiler or newer
 - CMake 3.21 or newer
-- Qt 6 with the Widgets and Sql modules
+- Qt 6 with the Widgets, Sql, and LinguistTools modules
 - The Qt SQLite SQL driver (`QSQLITE`)
 
 ## Installation
@@ -66,9 +71,27 @@ written in cents, not formatted currency units.
 
 ## Application entry point
 
-The current entry point is intentionally a minimal Qt window. Database access,
-transaction management, statistics, filtering, and CSV export are available
-through the C++ classes and can be connected to a UI in `src/main.cpp`.
+The Qt interface is implemented in `src/MainWindow.cpp` and launched by
+`src/main.cpp`. The application uses the existing workspace database when it is
+available, regardless of the process working directory, so starting the built
+executable does not silently open a different database. Appearance settings,
+including language, are saved locally.
+Choose Italian or English in the Appearance page; the new language takes effect
+the next time the application starts.
+
+Use the account selector in the sidebar to switch between account ledgers. New
+accounts have an independent opening balance and type. Internal transfers are
+recorded separately, update both account balances atomically, and are excluded
+from income/expense analysis.
+
+The account manager shows each account's balance, transaction count, and
+transfer count. Account names and types can be edited without changing history.
+Removal is limited to accounts with no transactions, no transfers, a zero
+balance, and at least one remaining account.
+
+Translation catalogs are maintained in `translations/ExpenseTracker_it.ts` and
+`translations/ExpenseTracker_en.ts`. CMake compiles them into `.qm` files in
+`build/translations`, alongside the application runtime files.
 
 ## Example menu design
 
