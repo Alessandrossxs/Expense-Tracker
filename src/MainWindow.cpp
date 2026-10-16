@@ -15,7 +15,7 @@
 #include <QDate>
 #include <QDateEdit>
 #include <QDoubleSpinBox>
-#include <QFileDialog>
+#include <QFile>\n#include <QFileDialog>
 #include <QFormLayout>
 #include <QFont>
 #include <QFontDatabase>
@@ -428,16 +428,7 @@ QTableWidgetItem *cell(
 QString databasePath()
 {
     const QString fileName = QStringLiteral("expense_tracker.db");
-    const QDir applicationDirectory(QCoreApplication::applicationDirPath());
-    const QString workspaceDatabase =
-        applicationDirectory.filePath(QStringLiteral("../") + fileName);
-    if (QFileInfo::exists(workspaceDatabase))
-        return QFileInfo(workspaceDatabase).canonicalFilePath();
-
     const QString currentDatabase = QDir::current().filePath(fileName);
-    if (QFileInfo::exists(currentDatabase))
-        return QFileInfo(currentDatabase).canonicalFilePath();
-
     const QString applicationDataDirectory =
         QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     if (applicationDataDirectory.isEmpty()) {
@@ -449,7 +440,43 @@ QString databasePath()
                    << applicationDataDirectory;
         return currentDatabase;
     }
-    return QDir(applicationDataDirectory).filePath(fileName);
+
+    const QString stableDatabase = QDir(applicationDataDirectory).filePath(fileName);
+    if (QFileInfo::exists(stableDatabase))
+        return stableDatabase;
+
+    // One-time migration from legacy working-directory locations. Copy rather than
+    // move so the original remains available as a backup if anything goes wrong.
+    const QDir applicationDirectory(QCoreApplication::applicationDirPath());
+    const QString workspaceDatabase =
+        applicationDirectory.filePath(QStringLiteral("../") + fileName);
+    const QStringList legacyCandidates = {workspaceDatabase, currentDatabase};
+    for (const QString &legacyPath : legacyCandidates) {
+        if (!QFileInfo::exists(legacyPath))
+            continue;
+
+        const QString canonicalLegacyPath = QFileInfo(legacyPath).canonicalFilePath();
+        if (canonicalLegacyPath.isEmpty())
+            continue;
+        if (canonicalLegacyPath == QFileInfo(stableDatabase).absoluteFilePath())
+            return stableDatabase;
+
+        if (QFile::copy(canonicalLegacyPath, stableDatabase)) {
+            QFile::setPermissions(
+                stableDatabase,
+                QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+            qInfo() << "Migrated Expense Tracker database to:" << stableDatabase;
+            return stableDatabase;
+        }
+
+        // Do not silently create an empty database if migration fails; keep using
+        // the existing file and report the issue in the application log.
+        qWarning() << "Could not migrate legacy database from" << canonicalLegacyPath
+                   << "to" << stableDatabase << "- continuing with legacy path";
+        return canonicalLegacyPath;
+    }
+
+    return stableDatabase;
 }
 
 QString accountTypeLabel(const QString &type)
