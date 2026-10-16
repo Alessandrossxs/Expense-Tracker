@@ -3790,6 +3790,15 @@ void MainWindow::exportCsv()
         tr("File CSV (*.csv)"));
     if (path.isEmpty())
         return;
+    if (QMessageBox::warning(
+            this,
+            tr("Esportazione non cifrata"),
+            tr("Il file CSV conterrà dati finanziari e note in chiaro. "
+               "Chiunque possa leggere il file potrà visualizzarli. Continuare?"),
+            QMessageBox::Yes | QMessageBox::No,
+            QMessageBox::No) != QMessageBox::Yes) {
+        return;
+    }
     if (!m_manager.exportTransactionsToCsv(m_accountId, path, currentFilter())) {
         showError(tr("Esportazione non riuscita: %1").arg(m_manager.lastError()));
         return;

@@ -973,6 +973,14 @@ Add an expense transaction to get started.</translation>
         <translation>Export transactions</translation>
     </message>
     <message>
+        <source>Esportazione non cifrata</source>
+        <translation>Unencrypted export</translation>
+    </message>
+    <message>
+        <source>Il file CSV conterrà dati finanziari e note in chiaro. Chiunque possa leggere il file potrà visualizzarli. Continuare?</source>
+        <translation>The CSV file will contain financial data and notes in plain text. Anyone who can read the file will be able to view them. Continue?</translation>
+    </message>
+    <message>
         <location filename="../src/MainWindow.cpp" line="2108"/>
         <source>File CSV (*.csv)</source>
         <translation>CSV files (*.csv)</translation>

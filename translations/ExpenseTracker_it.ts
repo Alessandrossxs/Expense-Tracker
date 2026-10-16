@@ -769,6 +769,14 @@ Aggiungi una transazione di tipo Uscita per iniziare.</translation>
             <translation>Esporta transazioni</translation>
         </message>
         <message>
+            <source>Esportazione non cifrata</source>
+            <translation>Esportazione non cifrata</translation>
+        </message>
+        <message>
+            <source>Il file CSV conterrà dati finanziari e note in chiaro. Chiunque possa leggere il file potrà visualizzarli. Continuare?</source>
+            <translation>Il file CSV conterrà dati finanziari e note in chiaro. Chiunque possa leggere il file potrà visualizzarli. Continuare?</translation>
+        </message>
+        <message>
             <location filename="../src/MainWindow.cpp" line="2108" />
             <source>File CSV (*.csv)</source>
             <translation>File CSV (*.csv)</translation>

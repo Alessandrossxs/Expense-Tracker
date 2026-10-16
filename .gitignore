@@ -12,6 +12,9 @@ dist/
 *.lib
 *.pdb
 *.db
+*.db-*
+*.sqlite
+*.sqlite-*
 
 CMakeCache.txt
 CMakeFiles/

@@ -90,7 +90,9 @@ Dates use the ISO format `YYYY-MM-DD`; amount bounds are inclusive.
 
 CSV exports use UTF-8 and contain the columns
 `transaction_id,account_id,category_id,date,type,amount_cents,notes`. Values
-are written in cents, not formatted currency units.
+are written in cents, not formatted currency units. CSV files are unencrypted;
+the application warns before creating one. Store exports only in a location
+protected by your Windows account and device encryption.
 
 ## Application entry point
 
