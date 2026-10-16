@@ -505,7 +505,7 @@ void MainWindow::refreshDashboard()
         return a.getDate() > b.getDate() ||
                (a.getDate() == b.getDate() && a.getId() > b.getId());
     });
-    m_recentTable->setRowCount(qMin(6, recent.size()));
+    m_recentTable->setRowCount(qMin(6, static_cast<int>(recent.size())));
     for (int row = 0; row < m_recentTable->rowCount(); ++row) {
         const Transaction &t = recent.at(row);
         m_recentTable->setItem(row, 0, cell(QDate::fromString(t.getDate(), Qt::ISODate).toString(QStringLiteral("dd/MM/yyyy"))));
