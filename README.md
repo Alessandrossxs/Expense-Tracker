@@ -66,8 +66,8 @@ Transaction filters are optional. Empty dates, category ID `0`, minimum amount
 Dates use the ISO format `YYYY-MM-DD`; amount bounds are inclusive.
 
 CSV exports use UTF-8 and contain the columns
-`transaction_id,account_id,category_id,date,type,amount_cents`. Values are
-written in cents, not formatted currency units.
+`transaction_id,account_id,category_id,date,type,amount_cents,notes`. Values
+are written in cents, not formatted currency units.
 
 ## Application entry point
 
@@ -78,6 +78,10 @@ executable does not silently open a different database. Appearance settings,
 including language, are saved locally.
 Choose Italian or English in the Appearance page; the new language takes effect
 the next time the application starts.
+
+Use `Ctrl+1` through `Ctrl+5` to switch between the sidebar pages, `Ctrl+N` to
+add a transaction from anywhere, and `Ctrl+F` to open transaction search. In
+the search field, `Enter` selects the first result and `Esc` clears the query.
 
 Use the account selector in the sidebar to switch between account ledgers. New
 accounts have an independent opening balance and type. Internal transfers are

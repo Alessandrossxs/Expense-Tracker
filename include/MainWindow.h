@@ -20,6 +20,7 @@ class QStackedWidget;
 class QTableWidget;
 class QWidget;
 class QPushButton;
+class QTimer;
 
 class MainWindow : public QMainWindow
 {
@@ -82,6 +83,7 @@ private:
     QDoubleSpinBox *m_filterMin = nullptr;
     QDoubleSpinBox *m_filterMax = nullptr;
     QLineEdit *m_transactionSearch = nullptr;
+    QTimer *m_transactionSearchTimer = nullptr;
     QPushButton *m_previousPage = nullptr;
     QPushButton *m_nextPage = nullptr;
     QPushButton *m_analysisPrevious = nullptr;

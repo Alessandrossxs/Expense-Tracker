@@ -170,6 +170,14 @@
         <translation>Dashboard</translation>
     </message>
     <message>
+        <source>Vai a %1 (Ctrl+%2)</source>
+        <translation>Go to %1 (Ctrl+%2)</translation>
+    </message>
+    <message>
+        <source>Aggiungi una transazione (Ctrl+N)</source>
+        <translation>Add a transaction (Ctrl+N)</translation>
+    </message>
+    <message>
         <location filename="../src/MainWindow.cpp" line="1016"/>
         <location filename="../src/MainWindow.cpp" line="1113"/>
         <source>Transazioni</source>

@@ -1372,13 +1372,14 @@ void MainWindow::buildUi()
         button->setCursor(Qt::PointingHandCursor);
         button->setCheckable(true);
         button->setChecked(i == 0);
+        button->setShortcut(QKeySequence(
+            QStringLiteral("Ctrl+%1").arg(i + 1)));
+        button->setToolTip(
+            tr("Vai a %1 (Ctrl+%2)").arg(navLabels[i]).arg(i + 1));
         navGroup->addButton(button, i);
         sideLayout->addWidget(button);
         connect(button, &QPushButton::clicked, this, [this, i] {
             m_pages->setCurrentIndex(i);
-            if (i == 1) refreshTransactions();
-            if (i == 2) refreshAnalysis();
-            if (i == 3) refreshCategories();
         });
     }
     sideLayout->addStretch();
@@ -1395,6 +1396,9 @@ void MainWindow::buildUi()
     rootLayout->addWidget(sidebar);
     rootLayout->addWidget(m_pages, 1);
     setCentralWidget(root);
+    auto *newTransactionShortcut = new QShortcut(QKeySequence::New, this);
+    connect(newTransactionShortcut, &QShortcut::activated,
+            this, &MainWindow::addTransaction);
     statusBar()->showMessage(tr("Database locale pronto"));
 }
 
@@ -1942,6 +1946,7 @@ QWidget *MainWindow::buildDashboardPage()
     auto *add = new QPushButton(tr("+ Nuova transazione"), page);
     add->setObjectName(QStringLiteral("primaryButton"));
     add->setMinimumHeight(42);
+    add->setToolTip(tr("Aggiungi una transazione (Ctrl+N)"));
     header->addWidget(add, 0, Qt::AlignVCenter);
     auto *view = new QPushButton(tr("Vedi tutte"), page);
     view->setObjectName(QStringLiteral("secondaryButton"));
@@ -2036,7 +2041,6 @@ QWidget *MainWindow::buildDashboardPage()
     connect(add, &QPushButton::clicked, this, &MainWindow::addTransaction);
     auto openTransactions = [this] {
         m_pages->setCurrentIndex(1);
-        refreshTransactions();
     };
     connect(view, &QPushButton::clicked, this, openTransactions);
     connect(viewRecent, &QPushButton::clicked, this, openTransactions);
@@ -2063,7 +2067,7 @@ QWidget *MainWindow::buildTransactionsPage()
     auto *add = new QPushButton(tr("+ Nuova transazione"), page);
     add->setObjectName(QStringLiteral("primaryButton"));
     add->setMinimumHeight(42);
-    add->setToolTip(tr("Registra una nuova entrata o uscita"));
+    add->setToolTip(tr("Aggiungi una transazione (Ctrl+N)"));
     headingRow->addWidget(add, 0, Qt::AlignVCenter);
     layout->addLayout(headingRow);
 
@@ -2148,6 +2152,9 @@ QWidget *MainWindow::buildTransactionsPage()
         tr("Cerca categoria, note, data, importo o ID…"));
     m_transactionSearch->setClearButtonEnabled(true);
     m_transactionSearch->setMinimumHeight(40);
+    m_transactionSearchTimer = new QTimer(this);
+    m_transactionSearchTimer->setSingleShot(true);
+    m_transactionSearchTimer->setInterval(100);
     m_sortOrder = new QComboBox(page);
     polishComboPopup(m_sortOrder);
     m_sortOrder->setToolTip(tr("Ordina i risultati"));
@@ -2284,9 +2291,26 @@ QWidget *MainWindow::buildTransactionsPage()
         refreshTransactions();
     });
     connect(m_transactionSearch, &QLineEdit::textChanged, this, [this] {
+        m_transactionSearchTimer->start();
+    });
+    connect(m_transactionSearchTimer, &QTimer::timeout, this, [this] {
         m_transactionPage = 0;
         renderTransactionsPage();
     });
+    connect(m_transactionSearch, &QLineEdit::returnPressed, this, [this] {
+        m_transactionSearchTimer->stop();
+        m_transactionPage = 0;
+        renderTransactionsPage();
+        if (m_transactionsTable->rowCount() == 0)
+            return;
+        m_transactionsTable->selectRow(0);
+        m_transactionsTable->setFocus();
+    });
+    auto *clearSearchShortcut =
+        new QShortcut(QKeySequence(Qt::Key_Escape), m_transactionSearch);
+    clearSearchShortcut->setContext(Qt::WidgetShortcut);
+    connect(clearSearchShortcut, &QShortcut::activated,
+            m_transactionSearch, &QLineEdit::clear);
     connect(m_pageSize, &QComboBox::currentIndexChanged, this, [this] {
         m_transactionPage = 0;
         renderTransactionsPage();

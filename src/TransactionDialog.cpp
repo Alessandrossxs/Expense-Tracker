@@ -10,6 +10,7 @@
 #include <QFormLayout>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QPushButton>
 #include <QVBoxLayout>
 #include <QtMath>
 
@@ -53,6 +54,7 @@ TransactionDialog::TransactionDialog(
 
     auto *buttons = new QDialogButtonBox(
         QDialogButtonBox::Save | QDialogButtonBox::Cancel, this);
+    buttons->button(QDialogButtonBox::Save)->setDefault(true);
     connect(buttons, &QDialogButtonBox::accepted, this, [this] {
         if (m_category->currentIndex() < 0) {
             QMessageBox::warning(this, tr("Categoria mancante"),
@@ -69,6 +71,12 @@ TransactionDialog::TransactionDialog(
     auto *layout = new QVBoxLayout(this);
     layout->addLayout(form);
     layout->addWidget(buttons);
+    setTabOrder(m_type, m_category);
+    setTabOrder(m_category, m_date);
+    setTabOrder(m_date, m_amount);
+    setTabOrder(m_amount, m_notes);
+    setTabOrder(m_notes, buttons->button(QDialogButtonBox::Save));
+    m_category->setFocus();
     reloadCategories();
 }
 

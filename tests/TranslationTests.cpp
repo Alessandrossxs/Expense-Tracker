@@ -50,6 +50,14 @@ int main(int argc, char *argv[])
         !expectEqual(QCoreApplication::translate("MainWindow", "Cerca categoria, note, data, importo o ID…"),
                      QStringLiteral("Search category, notes, date, amount, or ID…"),
                      "English note search placeholder") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Vai a %1 (Ctrl+%2)")
+                         .arg(QStringLiteral("Dashboard"))
+                         .arg(1),
+                     QStringLiteral("Go to Dashboard (Ctrl+1)"),
+                     "English navigation shortcut tooltip") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Aggiungi una transazione (Ctrl+N)"),
+                     QStringLiteral("Add a transaction (Ctrl+N)"),
+                     "English new transaction shortcut tooltip") ||
         !expectEqual(QCoreApplication::translate("MainWindow", "Ultimo mese"),
                      QStringLiteral("Last month"), "English analysis period") ||
         !expectEqual(QCoreApplication::translate("MainWindow", "Media mensile delle uscite"),
