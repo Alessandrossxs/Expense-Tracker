@@ -66,7 +66,6 @@ private:
     QLabel *m_analysisEmpty = nullptr;
     QLabel *m_dashboardTotalBalance = nullptr;
     QLabel *m_appearancePreview = nullptr;
-    QLabel *m_activeAccountSummary = nullptr;
     QComboBox *m_filterCategory = nullptr;
     QComboBox *m_filterType = nullptr;
     QComboBox *m_accountSelector = nullptr;
@@ -129,5 +128,6 @@ private:
     void deleteTransaction();
     void exportCsv();
     void addCategory();
+    void showTutorial();
     void showError(const QString &message);
 };

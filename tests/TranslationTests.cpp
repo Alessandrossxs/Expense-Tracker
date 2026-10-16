@@ -58,6 +58,12 @@ int main(int argc, char *argv[])
         !expectEqual(QCoreApplication::translate("MainWindow", "Aggiungi una transazione (Ctrl+N)"),
                      QStringLiteral("Add a transaction (Ctrl+N)"),
                      "English new transaction shortcut tooltip") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "◉  Tutorial"),
+                     QStringLiteral("◉  Tutorial"), "English tutorial button") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Passaggio %1 di %2")
+                         .arg(2)
+                         .arg(5),
+                     QStringLiteral("Step 2 of 5"), "English tutorial progress") ||
         !expectEqual(QCoreApplication::translate("MainWindow", "Ultimo mese"),
                      QStringLiteral("Last month"), "English analysis period") ||
         !expectEqual(QCoreApplication::translate("MainWindow", "Media mensile delle uscite"),

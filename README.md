@@ -82,6 +82,9 @@ the next time the application starts.
 Use `Ctrl+1` through `Ctrl+5` to switch between the sidebar pages, `Ctrl+N` to
 add a transaction from anywhere, and `Ctrl+F` to open transaction search. In
 the search field, `Enter` selects the first result and `Esc` clears the query.
+The Tutorial button at the bottom of the sidebar starts a step-by-step tour
+through the actual dashboard, transactions, categories, analysis, and appearance
+pages. The tour stays open and non-modal as it moves between sections.
 
 Use the account selector in the sidebar to switch between account ledgers. New
 accounts have an independent opening balance and type. Internal transfers are

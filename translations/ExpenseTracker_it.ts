@@ -823,6 +823,78 @@ Aggiungi una transazione di tipo Uscita per iniziare.</translation>
             <source>Categoria aggiunta</source>
             <translation>Categoria aggiunta</translation>
         </message>
+        <message>
+            <source>◉  Tutorial</source>
+            <translation>◉  Tutorial</translation>
+        </message>
+        <message>
+            <source>Tutorial Expense Tracker</source>
+            <translation>Tutorial Expense Tracker</translation>
+        </message>
+        <message>
+            <source>La tua panoramica</source>
+            <translation>La tua panoramica</translation>
+        </message>
+        <message>
+            <source>Scegli il conto</source>
+            <translation>Scegli il conto</translation>
+        </message>
+        <message>
+            <source>Registra e trova i movimenti</source>
+            <translation>Registra e trova i movimenti</translation>
+        </message>
+        <message>
+            <source>Esplora le tue analisi</source>
+            <translation>Esplora le tue analisi</translation>
+        </message>
+        <message>
+            <source>Personalizza l'app</source>
+            <translation>Personalizza l'app</translation>
+        </message>
+        <message>
+            <source>Controlla saldo, entrate e uscite del mese, l'andamento degli ultimi sei mesi e i movimenti recenti del conto attivo.</source>
+            <translation>Controlla saldo, entrate e uscite del mese, l'andamento degli ultimi sei mesi e i movimenti recenti del conto attivo.</translation>
+        </message>
+        <message>
+            <source>Seleziona un conto dalla barra laterale o fai doppio clic sul conto desiderato nella tabella della dashboard.</source>
+            <translation>Seleziona un conto dalla barra laterale o fai doppio clic sul conto desiderato nella tabella della dashboard.</translation>
+        </message>
+        <message>
+            <source>Aggiungi una transazione con importo, categoria e note facoltative. Usa la ricerca per trovare anche il testo delle note.</source>
+            <translation>Aggiungi una transazione con importo, categoria e note facoltative. Usa la ricerca per trovare anche il testo delle note.</translation>
+        </message>
+        <message>
+            <source>Confronta entrate e uscite, cambia periodo e consulta grafici e categorie per capire dove vanno i tuoi soldi.</source>
+            <translation>Confronta entrate e uscite, cambia periodo e consulta grafici e categorie per capire dove vanno i tuoi soldi.</translation>
+        </message>
+        <message>
+            <source>Scegli tema, colori e lingua nella pagina Aspetto. I dati restano salvati sul tuo dispositivo.</source>
+            <translation>Scegli tema, colori e lingua nella pagina Aspetto. I dati restano salvati sul tuo dispositivo.</translation>
+        </message>
+        <message>
+            <source>Passaggio %1 di %2</source>
+            <translation>Passaggio %1 di %2</translation>
+        </message>
+        <message>
+            <source>← Indietro</source>
+            <translation>← Indietro</translation>
+        </message>
+        <message>
+            <source>Organizza le categorie</source>
+            <translation>Organizza le categorie</translation>
+        </message>
+        <message>
+            <source>Consulta le categorie di entrata e uscita e aggiungine una quando ti serve.</source>
+            <translation>Consulta le categorie di entrata e uscita e aggiungine una quando ti serve.</translation>
+        </message>
+        <message>
+            <source>Avanti →</source>
+            <translation>Avanti →</translation>
+        </message>
+        <message>
+            <source>Fine</source>
+            <translation>Fine</translation>
+        </message>
     </context>
     <context>
         <name>QObject</name>

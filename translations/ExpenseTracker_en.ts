@@ -1235,6 +1235,78 @@ Add an expense transaction to get started.</translation>
         <source>Impossibile rimuovere il conto: %1</source>
         <translation>Could not remove account: %1</translation>
     </message>
+    <message>
+        <source>◉  Tutorial</source>
+        <translation>◉  Tutorial</translation>
+    </message>
+    <message>
+        <source>Tutorial Expense Tracker</source>
+        <translation>Expense Tracker tutorial</translation>
+    </message>
+    <message>
+        <source>La tua panoramica</source>
+        <translation>Your overview</translation>
+    </message>
+    <message>
+        <source>Scegli il conto</source>
+        <translation>Choose an account</translation>
+    </message>
+    <message>
+        <source>Registra e trova i movimenti</source>
+        <translation>Record and find transactions</translation>
+    </message>
+    <message>
+        <source>Esplora le tue analisi</source>
+        <translation>Explore your insights</translation>
+    </message>
+    <message>
+        <source>Personalizza l'app</source>
+        <translation>Personalize the app</translation>
+    </message>
+    <message>
+        <source>Controlla saldo, entrate e uscite del mese, l'andamento degli ultimi sei mesi e i movimenti recenti del conto attivo.</source>
+        <translation>Check the active account's balance, this month's income and expenses, its six-month trend, and recent transactions.</translation>
+    </message>
+    <message>
+        <source>Seleziona un conto dalla barra laterale o fai doppio clic sul conto desiderato nella tabella della dashboard.</source>
+        <translation>Select an account in the sidebar or double-click it in the dashboard table.</translation>
+    </message>
+    <message>
+        <source>Aggiungi una transazione con importo, categoria e note facoltative. Usa la ricerca per trovare anche il testo delle note.</source>
+        <translation>Add a transaction with an amount, category, and optional notes. Search also finds text in notes.</translation>
+    </message>
+    <message>
+        <source>Confronta entrate e uscite, cambia periodo e consulta grafici e categorie per capire dove vanno i tuoi soldi.</source>
+        <translation>Compare income and expenses, change the period, and explore charts and categories to see where your money goes.</translation>
+    </message>
+    <message>
+        <source>Scegli tema, colori e lingua nella pagina Aspetto. I dati restano salvati sul tuo dispositivo.</source>
+        <translation>Choose a theme, colors, and language on the Appearance page. Your data stays on your device.</translation>
+    </message>
+    <message>
+        <source>Passaggio %1 di %2</source>
+        <translation>Step %1 of %2</translation>
+    </message>
+    <message>
+        <source>← Indietro</source>
+        <translation>← Back</translation>
+    </message>
+    <message>
+        <source>Organizza le categorie</source>
+        <translation>Organize categories</translation>
+    </message>
+    <message>
+        <source>Consulta le categorie di entrata e uscita e aggiungine una quando ti serve.</source>
+        <translation>Review income and expense categories, and add one whenever you need it.</translation>
+    </message>
+    <message>
+        <source>Avanti →</source>
+        <translation>Next →</translation>
+    </message>
+    <message>
+        <source>Fine</source>
+        <translation>Done</translation>
+    </message>
 </context>
 <context>
     <name>QObject</name>

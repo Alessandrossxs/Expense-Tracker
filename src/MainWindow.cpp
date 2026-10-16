@@ -61,6 +61,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 namespace
 {
@@ -139,6 +140,130 @@ public:
     }
 };
 
+class TutorialGraphic final : public QWidget
+{
+public:
+    explicit TutorialGraphic(QWidget *parent = nullptr)
+        : QWidget(parent)
+    {
+        setMinimumHeight(220);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    }
+
+    void setStep(int step)
+    {
+        m_step = step;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.scale(width() / 560.0, height() / 220.0);
+
+        const QColor background = palette().color(QPalette::Window);
+        const QColor panel = palette().color(QPalette::Base);
+        const QColor text = palette().color(QPalette::WindowText);
+        const QColor muted = palette().color(QPalette::Mid);
+        const QColor accent = palette().color(QPalette::Highlight);
+        const QColor border = palette().color(QPalette::Midlight);
+        auto box = [&painter, &border](const QRectF &rect,
+                                      const QColor &fill,
+                                      qreal radius = 7.0) {
+            painter.setPen(QPen(border, 1));
+            painter.setBrush(fill);
+            painter.drawRoundedRect(rect, radius, radius);
+        };
+        auto line = [&painter, &muted](qreal x, qreal y, qreal w,
+                                       qreal thickness = 5.0) {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(muted);
+            painter.drawRoundedRect(QRectF(x, y, w, thickness), 2, 2);
+        };
+
+        painter.fillRect(QRectF(0, 0, 560, 220), background);
+        box(QRectF(8, 8, 544, 204), panel, 12);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(background);
+        painter.drawRoundedRect(QRectF(18, 18, 106, 184), 8, 8);
+        for (int index = 0; index < 5; ++index) {
+            const QRectF item(26, 50 + index * 27, 90, 20);
+            if (index == m_step)
+                box(item, accent, 5);
+            line(item.x() + 8, item.y() + 7, index == m_step ? 46 : 54, 5);
+        }
+        line(28, 29, 71, 7);
+
+        if (m_step == 0) {
+            for (int index = 0; index < 3; ++index) {
+                const QRectF card(140 + index * 126, 26, 112, 42);
+                box(card, index == 0 ? accent : background);
+                line(card.x() + 10, card.y() + 10, 40);
+                line(card.x() + 10, card.y() + 25, 68, 7);
+            }
+            box(QRectF(140, 80, 235, 105), background);
+            box(QRectF(386, 80, 148, 105), background);
+            painter.setPen(QPen(accent, 3, Qt::SolidLine, Qt::RoundCap));
+            painter.drawPolyline(QPolygonF{
+                QPointF(156, 161), QPointF(194, 140), QPointF(232, 151),
+                QPointF(270, 116), QPointF(310, 129), QPointF(357, 99)});
+            for (int index = 0; index < 3; ++index)
+                line(400, 101 + index * 25, 90);
+        } else if (m_step == 1) {
+            box(QRectF(140, 26, 394, 36), accent);
+            line(154, 39, 130);
+            for (int index = 0; index < 4; ++index) {
+                const QRectF row(140, 72 + index * 29, 394, 23);
+                box(row, index == 1 ? accent : background, 5);
+                line(154, row.y() + 9, 120);
+                line(402, row.y() + 9, 88);
+            }
+        } else if (m_step == 2) {
+            box(QRectF(140, 26, 178, 154), background);
+            for (int index = 0; index < 4; ++index) {
+                box(QRectF(154, 42 + index * 29, 150, 19),
+                    index == 3 ? accent : panel, 4);
+            }
+            box(QRectF(330, 26, 204, 154), background);
+            for (int index = 0; index < 4; ++index) {
+                const QRectF row(344, 42 + index * 31, 176, 23);
+                box(row, index == 2 ? accent : panel, 4);
+                line(352, row.y() + 9, 84);
+                line(462, row.y() + 9, 45);
+            }
+        } else if (m_step == 3) {
+            box(QRectF(140, 26, 394, 154), background);
+            painter.setPen(QPen(accent, 3, Qt::SolidLine, Qt::RoundCap));
+            painter.drawPolyline(QPolygonF{
+                QPointF(160, 145), QPointF(205, 122), QPointF(248, 137),
+                QPointF(292, 86), QPointF(337, 105), QPointF(380, 68),
+                QPointF(425, 82), QPointF(510, 48)});
+            for (int index = 0; index < 4; ++index) {
+                const QRectF bar(160, 158 - index * 24, 116 + index * 29, 8);
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(index == 0 ? accent : muted);
+                painter.drawRoundedRect(bar, 3, 3);
+            }
+        } else {
+            box(QRectF(140, 26, 394, 154), background);
+            for (int index = 0; index < 3; ++index) {
+                const QRectF card(156 + index * 121, 48, 105, 103);
+                box(card, index == 1 ? accent : panel, 9);
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(index == 1 ? panel : accent);
+                painter.drawEllipse(QRectF(card.x() + 35, card.y() + 17, 34, 34));
+                line(card.x() + 18, card.y() + 67, 69);
+                line(card.x() + 18, card.y() + 82, 48);
+            }
+        }
+    }
+
+private:
+    int m_step = 0;
+};
+
 QList<QColor> chartColors(const QString &palette, bool lightMode = false)
 {
     static const QList<QColor> ocean = {
@@ -206,6 +331,41 @@ QIcon paletteIcon(const QString &palette, bool lightMode)
         painter.drawRect(segment.adjusted(0, 0, -1, -1));
     }
     return QIcon(swatch);
+}
+
+QIcon expenseTrackerLogo(int size)
+{
+    QPixmap pixmap(size, size);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    const qreal unit = size / 64.0;
+    painter.scale(unit, unit);
+
+    QPainterPath tile;
+    tile.addRoundedRect(QRectF(2, 2, 60, 60), 16, 16);
+    QLinearGradient background(4, 4, 60, 60);
+    background.setColorAt(0.0, QColor(QStringLiteral("#102b3c")));
+    background.setColorAt(1.0, QColor(QStringLiteral("#111827")));
+    painter.fillPath(tile, background);
+
+    painter.setBrush(Qt::NoBrush);
+    painter.setPen(QPen(QColor(QStringLiteral("#22d3ee")), 3.2,
+                        Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.drawEllipse(QRectF(13, 13, 38, 38));
+
+    QPainterPath trend;
+    trend.moveTo(21, 39);
+    trend.lineTo(29, 31);
+    trend.lineTo(35, 36);
+    trend.lineTo(44, 25);
+    painter.drawPath(trend);
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(QStringLiteral("#34d399")));
+    painter.drawEllipse(QRectF(40, 21, 7, 7));
+    return QIcon(pixmap);
 }
 
 QLabel *pageTitle(const QString &text, QWidget *parent)
@@ -668,6 +828,7 @@ MainWindow::MainWindow(QWidget *parent)
     }
 
     setWindowTitle(tr("Expense Tracker"));
+    setWindowIcon(expenseTrackerLogo(64));
     resize(1440, 900);
     setMinimumSize(900, 620);
     setWindowState(windowState() | Qt::WindowMaximized);
@@ -687,9 +848,9 @@ MainWindow::MainWindow(QWidget *parent)
         QFrame#sidebar { background: @sidebarBackground@; border: none; }
         QLabel#brand {
             color: @sidebarBrand@;
-            font-size: 17pt;
+            font-size: 14pt;
             font-weight: 800;
-            padding: 12px 8px 26px 8px;
+            padding: 0;
         }
         QPushButton#navButton {
             color: @sidebarText@;
@@ -1322,18 +1483,24 @@ void MainWindow::buildUi()
     auto *sideLayout = new QVBoxLayout(sidebar);
     sideLayout->setContentsMargins(18, 24, 18, 22);
     sideLayout->setSpacing(11);
-    auto *brand = new QLabel(QStringLiteral("◈  Expense Tracker"), sidebar);
+    auto *brandRow = new QHBoxLayout;
+    brandRow->setContentsMargins(8, 12, 8, 26);
+    brandRow->setSpacing(9);
+    auto *brandIcon = new QLabel(sidebar);
+    brandIcon->setPixmap(expenseTrackerLogo(32).pixmap(QSize(32, 32)));
+    brandIcon->setFixedSize(32, 32);
+    auto *brand = new QLabel(QStringLiteral("Expense Tracker"), sidebar);
     brand->setObjectName(QStringLiteral("brand"));
-    sideLayout->addWidget(brand);
+    brand->setContentsMargins(0, 0, 0, 0);
+    brandRow->addWidget(brandIcon);
+    brandRow->addWidget(brand);
+    brandRow->addStretch();
+    sideLayout->addLayout(brandRow);
 
     m_accountSelector = new QComboBox(sidebar);
     polishComboPopup(m_accountSelector);
     m_accountSelector->setMinimumHeight(40);
     sideLayout->addWidget(m_accountSelector);
-    m_activeAccountSummary = new QLabel(sidebar);
-    m_activeAccountSummary->setObjectName(QStringLiteral("sidebarFooter"));
-    m_activeAccountSummary->setWordWrap(true);
-    sideLayout->addWidget(m_activeAccountSummary);
     auto *manageAccountsButton = new QPushButton(tr("Gestisci conti"), sidebar);
     manageAccountsButton->setObjectName(QStringLiteral("secondaryButton"));
     sideLayout->addWidget(manageAccountsButton);
@@ -1382,7 +1549,18 @@ void MainWindow::buildUi()
             m_pages->setCurrentIndex(i);
         });
     }
+    connect(m_pages, &QStackedWidget::currentChanged, this, [navGroup](int index) {
+        if (QAbstractButton *button = navGroup->button(index))
+            button->setChecked(true);
+    });
     sideLayout->addStretch();
+    auto *tutorialButton = new QPushButton(tr("◉  Tutorial"), sidebar);
+    tutorialButton->setObjectName(QStringLiteral("secondaryButton"));
+    tutorialButton->setMinimumHeight(40);
+    tutorialButton->setCursor(Qt::PointingHandCursor);
+    connect(tutorialButton, &QPushButton::clicked,
+            this, &MainWindow::showTutorial);
+    sideLayout->addWidget(tutorialButton);
     auto *footer = new QLabel(tr("Gestione personale\nDati salvati in locale"), sidebar);
     footer->setObjectName(QStringLiteral("sidebarFooter"));
     footer->setTextInteractionFlags(Qt::NoTextInteraction);
@@ -1400,6 +1578,119 @@ void MainWindow::buildUi()
     connect(newTransactionShortcut, &QShortcut::activated,
             this, &MainWindow::addTransaction);
     statusBar()->showMessage(tr("Database locale pronto"));
+}
+
+void MainWindow::showTutorial()
+{
+    if (findChild<QDialog *>(QStringLiteral("guidedTutorial")))
+        return;
+
+    const QStringList titles = {
+        tr("La tua panoramica"),
+        tr("Scegli il conto"),
+        tr("Registra e trova i movimenti"),
+        tr("Organizza le categorie"),
+        tr("Esplora le tue analisi"),
+        tr("Personalizza l'app")};
+    const QStringList descriptions = {
+        tr("Controlla saldo, entrate e uscite del mese, l'andamento degli ultimi sei mesi e i movimenti recenti del conto attivo."),
+        tr("Seleziona un conto dalla barra laterale o fai doppio clic sul conto desiderato nella tabella della dashboard."),
+        tr("Aggiungi una transazione con importo, categoria e note facoltative. Usa la ricerca per trovare anche il testo delle note."),
+        tr("Consulta le categorie di entrata e uscita e aggiungine una quando ti serve."),
+        tr("Confronta entrate e uscite, cambia periodo e consulta grafici e categorie per capire dove vanno i tuoi soldi."),
+        tr("Scegli tema, colori e lingua nella pagina Aspetto. I dati restano salvati sul tuo dispositivo.")};
+
+    const QList<int> pageIndexes = {0, 0, 1, 3, 2, 4};
+    auto *dialog = new QDialog(this, Qt::Tool);
+    dialog->setObjectName(QStringLiteral("guidedTutorial"));
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setWindowTitle(tr("Tutorial Expense Tracker"));
+    dialog->setModal(false);
+    dialog->setMinimumWidth(350);
+    dialog->resize(400, 280);
+    auto *layout = new QVBoxLayout(dialog);
+    layout->setContentsMargins(22, 18, 22, 18);
+    layout->setSpacing(10);
+
+    auto *stepCounter = new QLabel(dialog);
+    stepCounter->setObjectName(QStringLiteral("subTitle"));
+    auto *heading = new QLabel(dialog);
+    heading->setStyleSheet(QStringLiteral("font-size:17pt;font-weight:750;"));
+    auto *description = new QLabel(dialog);
+    description->setWordWrap(true);
+    description->setMinimumHeight(100);
+    description->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    auto *buttons = new QHBoxLayout;
+    auto *previous = new QPushButton(tr("← Indietro"), dialog);
+    previous->setObjectName(QStringLiteral("secondaryButton"));
+    auto *next = new QPushButton(tr("Avanti →"), dialog);
+    next->setObjectName(QStringLiteral("primaryButton"));
+    auto *close = new QPushButton(tr("Chiudi"), dialog);
+    close->setObjectName(QStringLiteral("secondaryButton"));
+    buttons->addWidget(previous);
+    buttons->addStretch();
+    buttons->addWidget(next);
+    buttons->addWidget(close);
+
+    layout->addWidget(stepCounter, 0, Qt::AlignRight);
+    layout->addWidget(heading);
+    layout->addWidget(description);
+    layout->addLayout(buttons);
+
+    auto currentStep = std::make_shared<int>(0);
+    auto updateStep = [this, dialog, stepCounter, heading, description,
+                       previous, next, titles, descriptions, pageIndexes,
+                       currentStep] {
+        stepCounter->setText(tr("Passaggio %1 di %2")
+                                 .arg(*currentStep + 1)
+                                 .arg(titles.size()));
+        heading->setText(titles.at(*currentStep));
+        description->setText(descriptions.at(*currentStep));
+        previous->setEnabled(*currentStep > 0);
+        next->setText(*currentStep + 1 == titles.size()
+                          ? tr("Fine")
+                          : tr("Avanti →"));
+        const int pageIndex = pageIndexes.at(*currentStep);
+        m_pages->setCurrentIndex(pageIndex);
+        if (pageIndex == 0) {
+            refreshDashboard();
+            if (*currentStep == 1) {
+                if (auto *scrollArea =
+                        qobject_cast<QScrollArea *>(m_pages->widget(0))) {
+                    scrollArea->ensureWidgetVisible(m_dashboardAccountsTable);
+                }
+            }
+        } else if (pageIndex == 1) {
+            refreshTransactions();
+        } else if (pageIndex == 2) {
+            refreshAnalysis();
+        } else if (pageIndex == 3) {
+            refreshCategories();
+        }
+    };
+    connect(previous, &QPushButton::clicked, dialog,
+            [currentStep, updateStep] {
+        if (*currentStep > 0) {
+            --*currentStep;
+            updateStep();
+        }
+    });
+    connect(next, &QPushButton::clicked, dialog,
+            [dialog, currentStep, updateStep, titles] {
+        if (*currentStep + 1 < titles.size()) {
+            ++*currentStep;
+            updateStep();
+        } else {
+            dialog->close();
+        }
+    });
+    connect(close, &QPushButton::clicked, dialog, &QDialog::close);
+    updateStep();
+    dialog->show();
+    dialog->move(mapToGlobal(QPoint(
+        width() - dialog->width() - 28,
+        height() - dialog->height() - 58)));
+    dialog->raise();
 }
 
 void MainWindow::refreshAccounts()
@@ -1421,11 +1712,13 @@ void MainWindow::refreshAccounts()
         const qint64 balance = account.value(QStringLiteral("Balance")).toLongLong();
         m_accountSelector->addItem(
             accountTypeIcon(type),
-            QStringLiteral("%1 · %2").arg(name, accountTypeLabel(type)),
+            name,
             id);
         m_accountSelector->setItemData(
             m_accountSelector->count() - 1,
-            tr("Saldo: %1").arg(money(balance)),
+            QStringLiteral("%1 · %2\n%3")
+                .arg(name, accountTypeLabel(type),
+                     tr("Saldo: %1").arg(money(balance))),
             Qt::ToolTipRole);
         m_accountSelector->setItemData(
             m_accountSelector->count() - 1, type, Qt::UserRole + 1);
@@ -1442,16 +1735,6 @@ void MainWindow::refreshAccounts()
             showError(tr("Impossibile salvare il conto attivo."));
     }
     m_accountSelector->setCurrentIndex(selectedIndex);
-    if (m_activeAccountSummary && selectedIndex >= 0) {
-        const QVariantMap &active = accounts.at(selectedIndex);
-        m_activeAccountSummary->setText(
-            QStringLiteral("%1\n%2 · %3 transazioni · %4 trasferimenti")
-                .arg(
-                    money(active.value(QStringLiteral("Balance")).toLongLong()),
-                    accountTypeLabel(active.value(QStringLiteral("Type")).toString()),
-                    QString::number(active.value(QStringLiteral("TransactionCount")).toInt()),
-                    QString::number(active.value(QStringLiteral("TransferCount")).toInt())));
-    }
 }
 
 void MainWindow::createAccount()
@@ -1988,6 +2271,7 @@ QWidget *MainWindow::buildDashboardPage()
         {tr("Conto"), tr("Tipo"), tr("Saldo")}, accountsPanel);
     m_dashboardAccountsTable->setSelectionMode(QAbstractItemView::NoSelection);
     m_dashboardAccountsTable->setFocusPolicy(Qt::NoFocus);
+    m_dashboardAccountsTable->setToolTip(tr("Fai doppio clic su un conto per attivarlo"));
     m_dashboardAccountsTable->setMinimumHeight(260);
     m_dashboardAccountsTable->setMaximumHeight(300);
     m_dashboardAccountsTable->verticalHeader()->setDefaultSectionSize(40);
@@ -1998,6 +2282,19 @@ QWidget *MainWindow::buildDashboardPage()
     m_dashboardAccountsTable->horizontalHeader()->setSectionResizeMode(
         2, QHeaderView::ResizeToContents);
     accountsLayout->addWidget(m_dashboardAccountsTable);
+    connect(m_dashboardAccountsTable, &QTableWidget::cellDoubleClicked,
+            this, [this](int row, int) {
+        if (!m_dashboardAccountsTable || !m_accountSelector)
+            return;
+        const QTableWidgetItem *accountItem =
+            m_dashboardAccountsTable->item(row, 0);
+        if (!accountItem)
+            return;
+        const int accountId = accountItem->data(Qt::UserRole).toInt();
+        const int accountIndex = m_accountSelector->findData(accountId);
+        if (accountIndex >= 0)
+            m_accountSelector->setCurrentIndex(accountIndex);
+    });
     layout->addWidget(accountsPanel);
 
     auto *activityRow = new QHBoxLayout;
@@ -2918,6 +3215,7 @@ void MainWindow::refreshDashboard()
         combinedBalance += accountBalance;
 
         auto *accountName = cell(name);
+        accountName->setData(Qt::UserRole, accountId);
         auto *accountTypeCell = cell(accountTypeLabel(type));
         accountTypeCell->setIcon(accountTypeIcon(type));
         accountTypeCell->setForeground(accountTypeColor(type));
