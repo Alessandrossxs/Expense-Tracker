@@ -39,8 +39,10 @@ private:
     QTableWidget *m_transactionsTable = nullptr;
     QTableWidget *m_categoriesTable = nullptr;
     QTableWidget *m_analysisTable = nullptr;
+    QTableWidget *m_dashboardAccountsTable = nullptr;
     ExpenseDonutChart *m_expenseDonut = nullptr;
     ExpenseTrendChart *m_expenseTrend = nullptr;
+    ExpenseTrendChart *m_dashboardTrend = nullptr;
     QLabel *m_balanceValue = nullptr;
     QLabel *m_incomeValue = nullptr;
     QLabel *m_expensesValue = nullptr;
@@ -58,7 +60,10 @@ private:
     QLabel *m_analysisTopCategory = nullptr;
     QLabel *m_analysisComparison = nullptr;
     QLabel *m_analysisActivity = nullptr;
+    QLabel *m_analysisTrendTitle = nullptr;
+    QLabel *m_analysisDateRange = nullptr;
     QLabel *m_analysisEmpty = nullptr;
+    QLabel *m_dashboardTotalBalance = nullptr;
     QLabel *m_appearancePreview = nullptr;
     QLabel *m_activeAccountSummary = nullptr;
     QComboBox *m_filterCategory = nullptr;
@@ -79,6 +84,8 @@ private:
     QLineEdit *m_transactionSearch = nullptr;
     QPushButton *m_previousPage = nullptr;
     QPushButton *m_nextPage = nullptr;
+    QPushButton *m_analysisPrevious = nullptr;
+    QPushButton *m_analysisNext = nullptr;
     QPushButton *m_editTransaction = nullptr;
     QPushButton *m_deleteTransaction = nullptr;
     QList<Transaction> m_filteredTransactions;
@@ -90,6 +97,8 @@ private:
     QString m_languageKey;
     QTranslator m_translator;
     int m_transactionPage = 0;
+    int m_analysisMonths = 1;
+    int m_analysisMonthOffset = 0;
 
     bool initializeData();
     void buildUi();

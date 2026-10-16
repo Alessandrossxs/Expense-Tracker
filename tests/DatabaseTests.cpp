@@ -289,7 +289,8 @@ int main(int argc, char *argv[])
                 managedExpenseCategoryId,
                 QStringLiteral("2026-02-03"),
                 1500,
-                false)),
+                false,
+                QStringLiteral("Market lunch"))),
             manager.lastError())) {
         return 1;
     }
@@ -302,7 +303,9 @@ int main(int argc, char *argv[])
         !expect(
             manager.getTransactions(managedAccountId, managedTransactions),
             manager.lastError()) ||
-        !expect(managedTransactions.size() == 2, QStringLiteral("Managed transactions were not retrieved"))) {
+        !expect(managedTransactions.size() == 2, QStringLiteral("Managed transactions were not retrieved")) ||
+        !expect(managedTransactions.last().getNotes() == QStringLiteral("Market lunch"),
+                QStringLiteral("Transaction notes were not persisted"))) {
         return 1;
     }
     Transaction updatedIncome = managedTransactions.first();
@@ -313,6 +316,16 @@ int main(int argc, char *argv[])
         !expect(manager.deleteTransaction(updatedIncome.getId()), manager.lastError()) ||
         !expect(manager.getAccountBalance(managedAccountId, managedBalance), manager.lastError()) ||
         !expect(managedBalance == 8500, QStringLiteral("Managed transaction deletion did not adjust balance"))) {
+        return 1;
+    }
+    Transaction managedUpdatedExpense = managedTransactions.last();
+    managedUpdatedExpense.setNotes(QStringLiteral("Lunch with coworkers"));
+    if (!expect(manager.updateTransaction(managedUpdatedExpense), manager.lastError()) ||
+        !expect(manager.getTransactions(managedAccountId, managedTransactions),
+                manager.lastError()) ||
+        !expect(managedTransactions.last().getNotes() ==
+                    QStringLiteral("Lunch with coworkers"),
+                QStringLiteral("Updated transaction notes were not persisted"))) {
         return 1;
     }
 
@@ -357,12 +370,15 @@ int main(int argc, char *argv[])
     const QByteArray csvContents = csvFile.readAll();
     if (!expect(
             csvContents.startsWith(
-                QByteArrayLiteral("transaction_id,account_id,category_id,date,type,amount_cents\r\n")),
+                QByteArrayLiteral("transaction_id,account_id,category_id,date,type,amount_cents,notes\r\n")),
             QStringLiteral("CSV header is incorrect")) ||
         !expect(csvContents.count('\n') == 2, QStringLiteral("CSV export contains unexpected rows")) ||
         !expect(
-            csvContents.contains(QByteArrayLiteral(",\"expense\",\"1500\"\r\n")),
-            QStringLiteral("CSV row is incorrect"))) {
+            csvContents.contains(
+                QByteArrayLiteral(",\"expense\",\"1500\",\"Lunch with coworkers\"\r\n")),
+            QStringLiteral("CSV row is incorrect")) ||
+        !expect(csvContents.contains(QByteArrayLiteral(",\"Lunch with coworkers\"\r\n")),
+                QStringLiteral("CSV notes were not exported"))) {
         return 1;
     }
 
@@ -403,9 +419,27 @@ int main(int argc, char *argv[])
                     "Password_Hash TEXT NOT NULL, Initial_Credit INTEGER NOT NULL, "
                     "Credit INTEGER NOT NULL)")), query.lastError().text()) ||
                 !expect(query.exec(QStringLiteral(
+                    "CREATE TABLE Category ("
+                    "ID_Category INTEGER PRIMARY KEY, Name TEXT NOT NULL, "
+                    "Type TEXT NOT NULL)")), query.lastError().text()) ||
+                !expect(query.exec(QStringLiteral(
+                    "INSERT INTO Category VALUES (1, 'Legacy income', 'in')")),
+                    query.lastError().text()) ||
+                !expect(query.exec(QStringLiteral(
+                    "CREATE TABLE Transactions ("
+                    "ID_Transaction INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    "Amount INTEGER NOT NULL, Date TEXT NOT NULL, Type TEXT NOT NULL, "
+                    "ID_Category INTEGER NOT NULL, ID_Account INTEGER NOT NULL)")),
+                    query.lastError().text()) ||
+                !expect(query.exec(QStringLiteral(
                     "INSERT INTO Bank_Account "
                     "(Creation_date, Name, Password_Hash, Initial_Credit, Credit) "
                     "VALUES ('2026-01-01', 'Legacy', 'hash', 1000, 1000)")),
+                    query.lastError().text()) ||
+                !expect(query.exec(QStringLiteral(
+                    "INSERT INTO Transactions "
+                    "(Amount, Date, Type, ID_Category, ID_Account) "
+                    "VALUES (500, '2026-01-02', 'in', 1, 1)")),
                     query.lastError().text())) {
                 return 1;
             }
@@ -416,12 +450,18 @@ int main(int argc, char *argv[])
     QSqlDatabase::removeDatabase(legacyConnection);
     Database migratedDatabase(legacyPath);
     QList<QVariantMap> migratedAccounts;
+    QList<Transaction> migratedTransactions;
     if (!expect(migratedDatabase.open(), migratedDatabase.lastError()) ||
         !expect(migratedDatabase.getAccounts(migratedAccounts), migratedDatabase.lastError()) ||
         !expect(migratedAccounts.size() == 1, QStringLiteral("Legacy account was not preserved")) ||
         !expect(migratedAccounts.first().value(QStringLiteral("Type")).toString() ==
                     QStringLiteral("checking"),
-                QStringLiteral("Legacy account type default was not applied"))) {
+                QStringLiteral("Legacy account type default was not applied")) ||
+        !expect(migratedDatabase.getTransactions(1, migratedTransactions),
+                migratedDatabase.lastError()) ||
+        !expect(migratedTransactions.size() == 1 &&
+                    migratedTransactions.first().getNotes().isEmpty(),
+                QStringLiteral("Legacy transaction notes migration failed"))) {
         return 1;
     }
 

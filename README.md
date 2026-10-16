@@ -89,6 +89,21 @@ transfer count. Account names and types can be edited without changing history.
 Removal is limited to accounts with no transactions, no transfers, a zero
 balance, and at least one remaining account.
 
+The dashboard shows the selected account's current balance, this month's
+income, expenses, and net balance, alongside the balance of every account and
+the combined balance. Its six-month trend and latest six transactions follow
+the selected account. Use Analysis for historical periods, comparisons, and
+expense-category breakdowns.
+
+Transactions can include optional notes. Notes are shown in the transaction
+list, included in CSV exports, and searchable from the transaction search box.
+
+The application opens maximized in a standard window. Its Analysis page includes monthly
+income/expense trends, category breakdowns, and period insights.
+Checking, debit-card, credit-card, and other accounts can be viewed over the
+last 1, 3, or 6 months, navigable one month at a time with the previous/next
+controls. Cash and savings accounts keep their all-time analysis.
+
 Translation catalogs are maintained in `translations/ExpenseTracker_it.ts` and
 `translations/ExpenseTracker_en.ts`. CMake compiles them into `.qm` files in
 `build/translations`, alongside the application runtime files.

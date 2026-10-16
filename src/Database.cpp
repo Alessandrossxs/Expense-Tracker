@@ -222,6 +222,7 @@ bool Database::initialize()
             "Type TEXT NOT NULL CHECK (Type IN ('in', 'out')), "
             "ID_Category INTEGER NOT NULL, "
             "ID_Account INTEGER NOT NULL, "
+            "Notes TEXT NOT NULL DEFAULT '', "
             "FOREIGN KEY (ID_Category) REFERENCES Category(ID_Category) "
             "ON UPDATE RESTRICT ON DELETE RESTRICT, "
             "FOREIGN KEY (ID_Account) REFERENCES Bank_Account(ID_Account) "
@@ -283,6 +284,25 @@ bool Database::initialize()
         !execute(QStringLiteral(
             "ALTER TABLE Bank_Account ADD COLUMN Account_Type TEXT NOT NULL "
             "DEFAULT 'checking'"))) {
+        return rollbackWithError(m_db, m_lastError);
+    }
+    QSqlQuery transactionColumns(m_db);
+    if (!transactionColumns.exec(QStringLiteral("PRAGMA table_info(Transactions)"))) {
+        setQueryError(m_lastError, QStringLiteral("Failed to inspect transaction schema"),
+                      transactionColumns);
+        return rollbackWithError(m_db, m_lastError);
+    }
+    bool hasNotes = false;
+    while (transactionColumns.next()) {
+        if (transactionColumns.value(1).toString() == QStringLiteral("Notes")) {
+            hasNotes = true;
+            break;
+        }
+    }
+    transactionColumns.finish();
+    if (!hasNotes &&
+        !execute(QStringLiteral(
+            "ALTER TABLE Transactions ADD COLUMN Notes TEXT NOT NULL DEFAULT ''"))) {
         return rollbackWithError(m_db, m_lastError);
     }
     if (!m_db.commit()) {
@@ -720,13 +740,15 @@ bool Database::addTransaction(const Transaction &transaction)
     QSqlQuery query(m_db);
     query.prepare(
         QStringLiteral(
-            "INSERT INTO Transactions (Amount, Date, Type, ID_Category, ID_Account) "
-            "VALUES (?, ?, ?, ?, ?)"));
+            "INSERT INTO Transactions "
+            "(Amount, Date, Type, ID_Category, ID_Account, Notes) "
+            "VALUES (?, ?, ?, ?, ?, ?)"));
     query.addBindValue(transaction.getAmount());
     query.addBindValue(transaction.getDate());
     query.addBindValue(type);
     query.addBindValue(transaction.getCategoryId());
     query.addBindValue(transaction.getAccountId());
+    query.addBindValue(transaction.getNotes());
     if (!query.exec()) {
         setQueryError(m_lastError, QStringLiteral("Failed to create transaction"), query);
         return rollbackWithError(m_db, m_lastError);
@@ -804,13 +826,14 @@ bool Database::updateTransaction(const Transaction &transaction)
     updateQuery.prepare(
         QStringLiteral(
             "UPDATE Transactions "
-            "SET Amount = ?, Date = ?, Type = ?, ID_Category = ?, ID_Account = ? "
+            "SET Amount = ?, Date = ?, Type = ?, ID_Category = ?, ID_Account = ?, Notes = ? "
             "WHERE ID_Transaction = ?"));
     updateQuery.addBindValue(transaction.getAmount());
     updateQuery.addBindValue(transaction.getDate());
     updateQuery.addBindValue(newType);
     updateQuery.addBindValue(transaction.getCategoryId());
     updateQuery.addBindValue(transaction.getAccountId());
+    updateQuery.addBindValue(transaction.getNotes());
     updateQuery.addBindValue(transaction.getId());
     if (!updateQuery.exec()) {
         setQueryError(m_lastError, QStringLiteral("Failed to update transaction"), updateQuery);
@@ -929,7 +952,7 @@ bool Database::getTransactions(
 
     QString sql =
         QStringLiteral(
-            "SELECT ID_Transaction, ID_Account, ID_Category, Date, Amount, Type "
+            "SELECT ID_Transaction, ID_Account, ID_Category, Date, Amount, Type, Notes "
             "FROM Transactions WHERE ID_Account = ?");
     if (!filter.dateFrom.isEmpty()) {
         sql += QStringLiteral(" AND Date >= ?");
@@ -984,7 +1007,8 @@ bool Database::getTransactions(
             query.value(2).toInt(),
             query.value(3).toString(),
             query.value(4).toLongLong(),
-            query.value(5).toString() == QStringLiteral("in")));
+            query.value(5).toString() == QStringLiteral("in"),
+            query.value(6).toString()));
     }
     transactions = result;
     return true;

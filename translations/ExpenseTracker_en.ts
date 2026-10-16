@@ -58,6 +58,21 @@
     </message>
 </context>
 <context>
+    <name>ExpenseTrendChart</name>
+    <message>
+        <source>Nessun dato mensile disponibile.</source>
+        <translation>No monthly data available.</translation>
+    </message>
+    <message>
+        <source>Entrate</source>
+        <translation>Income</translation>
+    </message>
+    <message>
+        <source>Uscite</source>
+        <translation>Expenses</translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message>
         <location filename="../src/MainWindow.cpp" line="395"/>
@@ -194,6 +209,10 @@ Data saved locally</translation>
         <translation>A clear overview of your finances.</translation>
     </message>
     <message>
+        <source>Il tuo mese, il saldo e le ultime operazioni.</source>
+        <translation>This month at a glance: balance and latest activity.</translation>
+    </message>
+    <message>
         <location filename="../src/MainWindow.cpp" line="1064"/>
         <source>Saldo attuale</source>
         <translation>Current balance</translation>
@@ -214,9 +233,57 @@ Data saved locally</translation>
         <translation>This month&apos;s expenses</translation>
     </message>
     <message>
+        <source>Entrate del mese</source>
+        <translation>This month&apos;s income</translation>
+    </message>
+    <message>
+        <source>Saldi di tutti i conti</source>
+        <translation>Balances across accounts</translation>
+    </message>
+    <message>
+        <source>Saldo complessivo:</source>
+        <translation>Total balance:</translation>
+    </message>
+    <message>
+        <source>Saldo netto del mese</source>
+        <translation>Net balance this month</translation>
+    </message>
+    <message>
+        <source>Entrate assorbite dalle uscite</source>
+        <translation>Income used by expenses</translation>
+    </message>
+    <message>
+        <source>Nessuna entrata nel mese</source>
+        <translation>No income this month</translation>
+    </message>
+    <message>
+        <source>%1% delle entrate</source>
+        <translation>%1% of income</translation>
+    </message>
+    <message>
+        <source>%1 movimenti questo mese</source>
+        <translation>%1 transactions this month</translation>
+    </message>
+    <message>
+        <source>Nessuna uscita questo mese</source>
+        <translation>No expenses this month</translation>
+    </message>
+    <message>
+        <source>Apri transazioni</source>
+        <translation>Open transactions</translation>
+    </message>
+    <message>
+        <source>Entrate e uscite · ultimi 6 mesi</source>
+        <translation>Income and expenses · last 6 months</translation>
+    </message>
+    <message>
         <location filename="../src/MainWindow.cpp" line="1077"/>
         <source>Movimenti recenti</source>
         <translation>Recent transactions</translation>
+    </message>
+    <message>
+        <source>Note</source>
+        <translation>Notes</translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="1080"/>
@@ -349,8 +416,8 @@ Data saved locally</translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="1206"/>
-        <source>Cerca categoria, data, importo o ID…</source>
-        <translation>Search category, date, amount, or ID…</translation>
+        <source>Cerca categoria, note, data, importo o ID…</source>
+        <translation>Search category, notes, date, amount, or ID…</translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="1211"/>
@@ -463,19 +530,104 @@ Data saved locally</translation>
         <translation>Spending insights</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1420"/>
-        <source>Una panoramica di tutte le uscite registrate, suddivise per categoria.</source>
-        <translation>An overview of all recorded expenses, grouped by category.</translation>
+        <source>Ultimo mese</source>
+        <translation>Last month</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1427"/>
-        <source>Spese complessive · tutti i periodi</source>
-        <translation>Total expenses · all time</translation>
+        <source>Ultimi 3 mesi</source>
+        <translation>Last 3 months</translation>
     </message>
     <message>
-        <location filename="../src/MainWindow.cpp" line="1438"/>
-        <source>Come si distribuiscono le uscite</source>
-        <translation>Expense breakdown</translation>
+        <source>Ultimi 6 mesi</source>
+        <translation>Last 6 months</translation>
+    </message>
+    <message>
+        <source>Tutti i periodi</source>
+        <translation>All time</translation>
+    </message>
+    <message>
+        <source>Periodo:</source>
+        <translation>Period:</translation>
+    </message>
+    <message>
+        <source>Vai al periodo precedente</source>
+        <translation>Go to previous period</translation>
+    </message>
+    <message>
+        <source>Vai al periodo successivo</source>
+        <translation>Go to next period</translation>
+    </message>
+    <message>
+        <source>Vai al periodo precedente di un mese</source>
+        <translation>Go back one month</translation>
+    </message>
+    <message>
+        <source>Vai al periodo successivo di un mese</source>
+        <translation>Go forward one month</translation>
+    </message>
+    <message>
+        <source>Entrate, uscite e tendenze del conto selezionato, con dettagli per categoria.</source>
+        <translation>Income, expenses, and trends for the selected account, with category details.</translation>
+    </message>
+    <message>
+        <source>Periodo analizzato: %1 – %2</source>
+        <translation>Analysis period: %1 – %2</translation>
+    </message>
+    <message>
+        <source>Periodo analizzato: tutte le transazioni (%1 – %2)</source>
+        <translation>Analysis period: all transactions (%1 – %2)</translation>
+    </message>
+    <message>
+        <source>Nessuna transazione registrata.</source>
+        <translation>No transactions recorded.</translation>
+    </message>
+    <message>
+        <source>Totale uscite</source>
+        <translation>Total expenses</translation>
+    </message>
+    <message>
+        <source>Totale entrate</source>
+        <translation>Total income</translation>
+    </message>
+    <message>
+        <source>Saldo netto del periodo</source>
+        <translation>Net balance for period</translation>
+    </message>
+    <message>
+        <source>Media mensile delle uscite</source>
+        <translation>Average monthly expenses</translation>
+    </message>
+    <message>
+        <source>Categoria con più uscite</source>
+        <translation>Top spending category</translation>
+    </message>
+    <message>
+        <source>Confronto con il periodo precedente</source>
+        <translation>Compared with previous period</translation>
+    </message>
+    <message>
+        <source>Movimenti nel periodo</source>
+        <translation>Transactions in period</translation>
+    </message>
+    <message>
+        <source>Andamento mensile · ultimi 6 mesi</source>
+        <translation>Monthly trend · last 6 months</translation>
+    </message>
+    <message>
+        <source>Andamento mensile · intervallo selezionato</source>
+        <translation>Monthly trend · selected period</translation>
+    </message>
+    <message>
+        <source>Entrate e uscite · 6 mesi fino a %1</source>
+        <translation>Income and expenses · 6 months through %1</translation>
+    </message>
+    <message>
+        <source>Spese per categoria</source>
+        <translation>Expenses by category</translation>
+    </message>
+    <message>
+        <source>Distribuzione delle uscite per categoria</source>
+        <translation>Expenses by category</translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="1450"/>
@@ -493,6 +645,46 @@ Data saved locally</translation>
 Aggiungi una transazione di tipo Uscita per iniziare.</source>
         <translation>There are no expenses to summarize yet.
 Add an expense transaction to get started.</translation>
+    </message>
+    <message>
+        <source>Nessuna spesa</source>
+        <translation>No expenses</translation>
+    </message>
+    <message>
+        <source>Confronto non disponibile per l&apos;intero periodo</source>
+        <translation>Comparison unavailable for all time</translation>
+    </message>
+    <message>
+        <source>Nuove uscite nel periodo</source>
+        <translation>New expenses in this period</translation>
+    </message>
+    <message>
+        <source>Nessuna uscita nei due periodi</source>
+        <translation>No expenses in either period</translation>
+    </message>
+    <message>
+        <source>rispetto al periodo precedente</source>
+        <translation>compared with previous period</translation>
+    </message>
+    <message>
+        <source>%1 movimenti · %2 uscite</source>
+        <translation>%1 transactions · %2 expenses</translation>
+    </message>
+    <message>
+        <source>Il totale delle transazioni supera l&apos;intervallo supportato.</source>
+        <translation>The transaction total exceeds the supported range.</translation>
+    </message>
+    <message>
+        <source>Il totale mensile supera l&apos;intervallo supportato.</source>
+        <translation>The monthly total exceeds the supported range.</translation>
+    </message>
+    <message>
+        <source>La media mensile supera l&apos;intervallo supportato.</source>
+        <translation>The monthly average exceeds the supported range.</translation>
+    </message>
+    <message>
+        <source>Impossibile salvare il periodo di analisi.</source>
+        <translation>Could not save the analysis period.</translation>
     </message>
     <message>
         <location filename="../src/MainWindow.cpp" line="1475"/>
@@ -1085,6 +1277,14 @@ Add an expense transaction to get started.</translation>
         <location filename="../src/TransactionDialog.cpp" line="46"/>
         <source>Importo</source>
         <translation>Amount</translation>
+    </message>
+    <message>
+        <source>Note</source>
+        <translation>Notes</translation>
+    </message>
+    <message>
+        <source>Aggiungi dettagli utili (facoltativo)</source>
+        <translation>Add useful details (optional)</translation>
     </message>
     <message>
         <location filename="../src/TransactionDialog.cpp" line="52"/>

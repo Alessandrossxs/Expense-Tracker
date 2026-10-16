@@ -39,10 +39,29 @@ int main(int argc, char *argv[])
                      QStringLiteral("Transfers between accounts"), "English transfers") ||
         !expectEqual(QCoreApplication::translate("MainWindow", "Gestisci conti"),
                      QStringLiteral("Manage accounts"), "English account management") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Saldo netto del mese"),
+                     QStringLiteral("Net balance this month"), "English dashboard insight") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Entrate del mese"),
+                     QStringLiteral("This month's income"), "English monthly dashboard income") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Saldi di tutti i conti"),
+                     QStringLiteral("Balances across accounts"), "English account balances") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Note"),
+                     QStringLiteral("Notes"), "English transaction notes") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Cerca categoria, note, data, importo o ID…"),
+                     QStringLiteral("Search category, notes, date, amount, or ID…"),
+                     "English note search placeholder") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Ultimo mese"),
+                     QStringLiteral("Last month"), "English analysis period") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Media mensile delle uscite"),
+                     QStringLiteral("Average monthly expenses"), "English analysis insight") ||
+        !expectEqual(QCoreApplication::translate("MainWindow", "Periodo analizzato: %1 – %2"),
+                     QStringLiteral("Analysis period: %1 – %2"), "English analysis dates") ||
         !expectEqual(QCoreApplication::translate("CategoryNames", "Stipendio"),
                      QStringLiteral("Salary"), "English category") ||
         !expectEqual(QCoreApplication::translate("TransactionDialog", "Uscita"),
-                     QStringLiteral("Expense"), "English transaction type")) {
+                     QStringLiteral("Expense"), "English transaction type") ||
+        !expectEqual(QCoreApplication::translate("TransactionDialog", "Note"),
+                     QStringLiteral("Notes"), "English transaction note field")) {
         return 1;
     }
     application.removeTranslator(&english);

@@ -218,6 +218,10 @@ Dati salvati in locale</translation>
             <translation>Movimenti recenti</translation>
         </message>
         <message>
+            <source>Note</source>
+            <translation>Note</translation>
+        </message>
+        <message>
             <location filename="../src/MainWindow.cpp" line="1080" />
             <location filename="../src/MainWindow.cpp" line="1256" />
             <source>Data</source>
@@ -348,8 +352,8 @@ Dati salvati in locale</translation>
         </message>
         <message>
             <location filename="../src/MainWindow.cpp" line="1206" />
-            <source>Cerca categoria, data, importo o ID…</source>
-            <translation>Cerca categoria, data, importo o ID…</translation>
+            <source>Cerca categoria, note, data, importo o ID…</source>
+            <translation>Cerca categoria, note, data, importo o ID…</translation>
         </message>
         <message>
             <location filename="../src/MainWindow.cpp" line="1211" />
@@ -460,21 +464,6 @@ Dati salvati in locale</translation>
             <location filename="../src/MainWindow.cpp" line="1418" />
             <source>Analisi delle spese</source>
             <translation>Analisi delle spese</translation>
-        </message>
-        <message>
-            <location filename="../src/MainWindow.cpp" line="1420" />
-            <source>Una panoramica di tutte le uscite registrate, suddivise per categoria.</source>
-            <translation>Una panoramica di tutte le uscite registrate, suddivise per categoria.</translation>
-        </message>
-        <message>
-            <location filename="../src/MainWindow.cpp" line="1427" />
-            <source>Spese complessive · tutti i periodi</source>
-            <translation>Spese complessive · tutti i periodi</translation>
-        </message>
-        <message>
-            <location filename="../src/MainWindow.cpp" line="1438" />
-            <source>Come si distribuiscono le uscite</source>
-            <translation>Come si distribuiscono le uscite</translation>
         </message>
         <message>
             <location filename="../src/MainWindow.cpp" line="1450" />
@@ -876,6 +865,14 @@ Aggiungi una transazione di tipo Uscita per iniziare.</translation>
             <location filename="../src/TransactionDialog.cpp" line="46" />
             <source>Importo</source>
             <translation>Importo</translation>
+        </message>
+        <message>
+            <source>Note</source>
+            <translation>Note</translation>
+        </message>
+        <message>
+            <source>Aggiungi dettagli utili (facoltativo)</source>
+            <translation>Aggiungi dettagli utili (facoltativo)</translation>
         </message>
         <message>
             <location filename="../src/TransactionDialog.cpp" line="52" />

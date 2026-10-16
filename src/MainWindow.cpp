@@ -40,6 +40,7 @@
 #include <QScrollArea>
 #include <QStyleFactory>
 #include <QStackedWidget>
+#include <QStandardItemModel>
 #include <QStatusBar>
 #include <QShortcut>
 #include <QTableWidget>
@@ -465,6 +466,124 @@ private:
     qint64 m_total = 0;
 };
 
+class ExpenseTrendChart : public QWidget
+{
+    Q_OBJECT
+
+public:
+    explicit ExpenseTrendChart(QWidget *parent = nullptr)
+        : QWidget(parent)
+    {
+        setMinimumHeight(180);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    }
+
+    void setData(const QStringList &months, const QList<qint64> &income,
+                 const QList<qint64> &expenses, const QColor &incomeColor,
+                 const QColor &expenseColor, const QColor &textColor,
+                 const QColor &mutedColor, const QColor &gridColor)
+    {
+        m_months = months;
+        m_income = income;
+        m_expenses = expenses;
+        m_incomeColor = incomeColor;
+        m_expenseColor = expenseColor;
+        m_textColor = textColor;
+        m_mutedColor = mutedColor;
+        m_gridColor = gridColor;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        const QRectF chart = QRectF(rect()).adjusted(52, 14, -18, -36);
+        const int count = qMin(m_months.size(), qMin(m_income.size(), m_expenses.size()));
+        if (count == 0) {
+            painter.setPen(m_mutedColor);
+            painter.drawText(rect(), Qt::AlignCenter, tr("Nessun dato mensile disponibile."));
+            return;
+        }
+
+        qint64 maximum = 0;
+        for (int index = 0; index < count; ++index)
+            maximum = qMax(maximum, qMax(m_income.at(index), m_expenses.at(index)));
+        if (maximum <= 0)
+            maximum = 1;
+
+        painter.setFont(QFont(font().family(), 8));
+        for (int line = 0; line <= 3; ++line) {
+            const qreal y = chart.bottom() -
+                chart.height() * static_cast<qreal>(line) / 3.0;
+            painter.setPen(QPen(m_gridColor, 1, Qt::DashLine));
+            painter.drawLine(QPointF(chart.left(), y), QPointF(chart.right(), y));
+            const qint64 value = static_cast<qint64>(
+                static_cast<long double>(maximum) * line / 3.0L);
+            painter.setPen(m_mutedColor);
+            painter.drawText(
+                QRectF(0, y - 8, chart.left() - 8, 16),
+                Qt::AlignRight | Qt::AlignVCenter,
+                QLocale().toCurrencyString(
+                    static_cast<double>(value) / 100.0, QStringLiteral("€")));
+        }
+
+        const qreal groupWidth = chart.width() / count;
+        const qreal barWidth = qMin<qreal>(22, groupWidth * 0.26);
+        for (int index = 0; index < count; ++index) {
+            const qreal center = chart.left() + groupWidth * (index + 0.5);
+            const qreal incomeHeight =
+                chart.height() * static_cast<qreal>(m_income.at(index)) / maximum;
+            const qreal expenseHeight =
+                chart.height() * static_cast<qreal>(m_expenses.at(index)) / maximum;
+            painter.setPen(Qt::NoPen);
+            if (m_income.at(index) > 0) {
+                painter.setBrush(m_incomeColor);
+                painter.drawRoundedRect(
+                    QRectF(center - barWidth - 2, chart.bottom() - incomeHeight,
+                           barWidth, qMax<qreal>(4, incomeHeight)), 4, 4);
+            }
+            if (m_expenses.at(index) > 0) {
+                painter.setBrush(m_expenseColor);
+                painter.drawRoundedRect(
+                    QRectF(center + 2, chart.bottom() - expenseHeight,
+                           barWidth, qMax<qreal>(4, expenseHeight)), 4, 4);
+            }
+            painter.setPen(m_textColor);
+            painter.drawText(
+                QRectF(chart.left() + groupWidth * index,
+                       chart.bottom() + 7, groupWidth, 20),
+                Qt::AlignHCenter | Qt::AlignTop, m_months.at(index));
+        }
+
+        const qreal legendY = height() - 8;
+        const qreal legendX = qMax<qreal>(chart.left(), width() / 2.0 - 95);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(m_incomeColor);
+        painter.drawRoundedRect(QRectF(legendX, legendY - 9, 10, 10), 3, 3);
+        painter.setPen(m_textColor);
+        painter.drawText(QRectF(legendX + 15, legendY - 13, 72, 18),
+                         Qt::AlignLeft | Qt::AlignVCenter, tr("Entrate"));
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(m_expenseColor);
+        painter.drawRoundedRect(QRectF(legendX + 92, legendY - 9, 10, 10), 3, 3);
+        painter.setPen(m_textColor);
+        painter.drawText(QRectF(legendX + 107, legendY - 13, 90, 18),
+                         Qt::AlignLeft | Qt::AlignVCenter, tr("Uscite"));
+    }
+
+private:
+    QStringList m_months;
+    QList<qint64> m_income;
+    QList<qint64> m_expenses;
+    QColor m_incomeColor = QColor(QStringLiteral("#15803d"));
+    QColor m_expenseColor = QColor(QStringLiteral("#b91c1c"));
+    QColor m_textColor = QColor(QStringLiteral("#172033"));
+    QColor m_mutedColor = QColor(QStringLiteral("#475569"));
+    QColor m_gridColor = QColor(QStringLiteral("#cbd5e1"));
+};
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
       m_manager(databasePath())
@@ -549,8 +668,9 @@ MainWindow::MainWindow(QWidget *parent)
     }
 
     setWindowTitle(tr("Expense Tracker"));
-    resize(1180, 760);
+    resize(1440, 900);
     setMinimumSize(900, 620);
+    setWindowState(windowState() | Qt::WindowMaximized);
     m_baseStyleSheet = QStringLiteral(R"(
         QMainWindow, QWidget {
             background: @background@;
@@ -1303,6 +1423,8 @@ void MainWindow::refreshAccounts()
             m_accountSelector->count() - 1,
             tr("Saldo: %1").arg(money(balance)),
             Qt::ToolTipRole);
+        m_accountSelector->setItemData(
+            m_accountSelector->count() - 1, type, Qt::UserRole + 1);
         if (id == m_accountId)
             selectedIndex = m_accountSelector->count() - 1;
     }
@@ -1799,57 +1921,126 @@ void MainWindow::openTransfers()
 
 QWidget *MainWindow::buildDashboardPage()
 {
+    auto *scrollArea = new QScrollArea;
+    scrollArea->setObjectName(QStringLiteral("dashboardScrollArea"));
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
     auto *page = new QWidget;
+    scrollArea->setWidget(page);
     auto *layout = new QVBoxLayout(page);
-    layout->setContentsMargins(30, 28, 30, 26);
-    layout->setSpacing(20);
+    layout->setContentsMargins(30, 24, 30, 26);
+    layout->setSpacing(14);
 
-    layout->addWidget(pageTitle(tr("Panoramica"), page));
-    auto *subtitle = new QLabel(tr("Un riepilogo chiaro delle tue finanze."), page);
+    auto *header = new QHBoxLayout;
+    auto *titleGroup = new QVBoxLayout;
+    titleGroup->setSpacing(4);
+    titleGroup->addWidget(pageTitle(tr("Panoramica"), page));
+    auto *subtitle = new QLabel(tr("Il tuo mese, il saldo e le ultime operazioni."), page);
     subtitle->setObjectName(QStringLiteral("subTitle"));
-    layout->addWidget(subtitle);
+    titleGroup->addWidget(subtitle);
+    header->addLayout(titleGroup, 1);
+    auto *add = new QPushButton(tr("+ Nuova transazione"), page);
+    add->setObjectName(QStringLiteral("primaryButton"));
+    add->setMinimumHeight(42);
+    header->addWidget(add, 0, Qt::AlignVCenter);
+    auto *view = new QPushButton(tr("Vedi tutte"), page);
+    view->setObjectName(QStringLiteral("secondaryButton"));
+    view->setMinimumHeight(42);
+    header->addWidget(view, 0, Qt::AlignVCenter);
+    layout->addLayout(header);
 
     auto *metrics = new QHBoxLayout;
     metrics->setSpacing(14);
     metrics->addWidget(
         metricCard(tr("Saldo attuale"), QStringLiteral("balance"), &m_balanceValue, page), 1);
     metrics->addWidget(
-        metricCard(tr("Entrate totali"), QStringLiteral("income"), &m_incomeValue, page), 1);
+        metricCard(tr("Entrate del mese"), QStringLiteral("income"), &m_incomeValue, page), 1);
     metrics->addWidget(
-        metricCard(tr("Uscite totali"), QStringLiteral("expenses"), &m_expensesValue, page), 1);
+        metricCard(tr("Uscite del mese"), QStringLiteral("expenses"), &m_expensesValue, page), 1);
     metrics->addWidget(
-        metricCard(tr("Uscite del mese"), QStringLiteral("month"), &m_monthValue, page), 1);
+        metricCard(tr("Saldo netto del mese"), QStringLiteral("month"), &m_monthValue, page), 1);
     layout->addLayout(metrics);
+
+    auto *accountsPanel = new QFrame(page);
+    accountsPanel->setObjectName(QStringLiteral("panel"));
+    auto *accountsLayout = new QVBoxLayout(accountsPanel);
+    accountsLayout->setContentsMargins(18, 14, 18, 14);
+    accountsLayout->setSpacing(8);
+    auto *accountsHeader = new QHBoxLayout;
+    auto *accountsTitle = new QLabel(tr("Saldi di tutti i conti"), accountsPanel);
+    accountsTitle->setStyleSheet(QStringLiteral("font-size:13pt;font-weight:700;"));
+    accountsHeader->addWidget(accountsTitle);
+    accountsHeader->addStretch();
+    auto *totalCaption = new QLabel(tr("Saldo complessivo:"), accountsPanel);
+    totalCaption->setObjectName(QStringLiteral("subTitle"));
+    accountsHeader->addWidget(totalCaption);
+    m_dashboardTotalBalance = new QLabel(QStringLiteral("—"), accountsPanel);
+    m_dashboardTotalBalance->setStyleSheet(QStringLiteral("font-size:13pt;font-weight:800;"));
+    accountsHeader->addWidget(m_dashboardTotalBalance);
+    accountsLayout->addLayout(accountsHeader);
+
+    m_dashboardAccountsTable = makeTable(
+        {tr("Conto"), tr("Tipo"), tr("Saldo")}, accountsPanel);
+    m_dashboardAccountsTable->setSelectionMode(QAbstractItemView::NoSelection);
+    m_dashboardAccountsTable->setFocusPolicy(Qt::NoFocus);
+    m_dashboardAccountsTable->setMinimumHeight(260);
+    m_dashboardAccountsTable->setMaximumHeight(300);
+    m_dashboardAccountsTable->verticalHeader()->setDefaultSectionSize(40);
+    m_dashboardAccountsTable->horizontalHeader()->setSectionResizeMode(
+        0, QHeaderView::Stretch);
+    m_dashboardAccountsTable->horizontalHeader()->setSectionResizeMode(
+        1, QHeaderView::ResizeToContents);
+    m_dashboardAccountsTable->horizontalHeader()->setSectionResizeMode(
+        2, QHeaderView::ResizeToContents);
+    accountsLayout->addWidget(m_dashboardAccountsTable);
+    layout->addWidget(accountsPanel);
+
+    auto *activityRow = new QHBoxLayout;
+    activityRow->setSpacing(14);
+    auto *trendPanel = new QFrame(page);
+    trendPanel->setObjectName(QStringLiteral("panel"));
+    auto *trendLayout = new QVBoxLayout(trendPanel);
+    trendLayout->setContentsMargins(18, 14, 18, 12);
+    trendLayout->setSpacing(6);
+    auto *trendTitle = new QLabel(
+        tr("Entrate e uscite · ultimi 6 mesi"), trendPanel);
+    trendTitle->setStyleSheet(QStringLiteral("font-size:13pt;font-weight:700;"));
+    trendLayout->addWidget(trendTitle);
+    m_dashboardTrend = new ExpenseTrendChart(trendPanel);
+    m_dashboardTrend->setMinimumHeight(210);
+    trendLayout->addWidget(m_dashboardTrend, 1);
+    activityRow->addWidget(trendPanel, 3);
 
     auto *recentPanel = new QFrame(page);
     recentPanel->setObjectName(QStringLiteral("panel"));
     auto *recentLayout = new QVBoxLayout(recentPanel);
-    recentLayout->setContentsMargins(18, 18, 18, 18);
+    recentLayout->setContentsMargins(18, 14, 18, 16);
+    recentLayout->setSpacing(10);
+    auto *recentHeader = new QHBoxLayout;
     auto *heading = new QLabel(tr("Movimenti recenti"), recentPanel);
     heading->setStyleSheet(QStringLiteral("font-size:14pt;font-weight:700;"));
-    recentLayout->addWidget(heading);
+    recentHeader->addWidget(heading);
+    recentHeader->addStretch();
+    auto *viewRecent = new QPushButton(tr("Apri transazioni"), recentPanel);
+    viewRecent->setObjectName(QStringLiteral("secondaryButton"));
+    recentHeader->addWidget(viewRecent);
+    recentLayout->addLayout(recentHeader);
     m_recentTable = makeTable({tr("Data"), tr("Categoria"), tr("Tipo"), tr("Importo")}, recentPanel);
     m_recentTable->setSelectionMode(QAbstractItemView::NoSelection);
     m_recentTable->setFocusPolicy(Qt::NoFocus);
     m_recentTable->setMinimumHeight(260);
     recentLayout->addWidget(m_recentTable);
-    layout->addWidget(recentPanel, 1);
+    activityRow->addWidget(recentPanel, 4);
+    layout->addLayout(activityRow);
 
-    auto *actions = new QHBoxLayout;
-    auto *add = new QPushButton(tr("+ Nuova transazione"), page);
-    add->setObjectName(QStringLiteral("primaryButton"));
-    auto *view = new QPushButton(tr("Vedi tutte"), page);
-    view->setObjectName(QStringLiteral("secondaryButton"));
-    actions->addWidget(add);
-    actions->addWidget(view);
-    actions->addStretch();
-    layout->addLayout(actions);
     connect(add, &QPushButton::clicked, this, &MainWindow::addTransaction);
-    connect(view, &QPushButton::clicked, this, [this] {
+    auto openTransactions = [this] {
         m_pages->setCurrentIndex(1);
         refreshTransactions();
-    });
-    return page;
+    };
+    connect(view, &QPushButton::clicked, this, openTransactions);
+    connect(viewRecent, &QPushButton::clicked, this, openTransactions);
+    return scrollArea;
 }
 
 QWidget *MainWindow::buildTransactionsPage()
@@ -1954,7 +2145,7 @@ QWidget *MainWindow::buildTransactionsPage()
     m_transactionSearch = new QLineEdit(page);
     m_transactionSearch->setObjectName(QStringLiteral("transactionSearch"));
     m_transactionSearch->setPlaceholderText(
-        tr("Cerca categoria, data, importo o ID…"));
+        tr("Cerca categoria, note, data, importo o ID…"));
     m_transactionSearch->setClearButtonEnabled(true);
     m_transactionSearch->setMinimumHeight(40);
     m_sortOrder = new QComboBox(page);
@@ -2006,8 +2197,9 @@ QWidget *MainWindow::buildTransactionsPage()
     layout->addLayout(summary);
 
     m_transactionsTable = makeTable(
-        {tr("Data"), tr("Categoria"), tr("Tipo"), tr("Importo"), tr("ID")}, page);
-    m_transactionsTable->setColumnHidden(4, true);
+        {tr("Data"), tr("Categoria"), tr("Tipo"), tr("Importo"),
+         tr("Note"), tr("ID")}, page);
+    m_transactionsTable->setColumnHidden(5, true);
     m_transactionsTable->setMinimumHeight(180);
     m_transactionsTable->verticalHeader()->setDefaultSectionSize(44);
     m_transactionsTable->setSortingEnabled(false);
@@ -2016,6 +2208,7 @@ QWidget *MainWindow::buildTransactionsPage()
     m_transactionsTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_transactionsTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
     m_transactionsTable->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+    m_transactionsTable->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Stretch);
     layout->addWidget(m_transactionsTable, 1);
 
     m_transactionEmpty = new QLabel(tr("Nessuna transazione corrisponde ai filtri."), page);
@@ -2163,54 +2356,139 @@ QWidget *MainWindow::buildCategoriesPage()
 
 QWidget *MainWindow::buildAnalysisPage()
 {
+    auto *scrollArea = new QScrollArea;
+    scrollArea->setObjectName(QStringLiteral("analysisScrollArea"));
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
     auto *page = new QWidget;
+    scrollArea->setWidget(page);
     auto *layout = new QVBoxLayout(page);
-    layout->setContentsMargins(30, 26, 30, 24);
-    layout->setSpacing(16);
+    layout->setContentsMargins(30, 26, 30, 26);
+    layout->setSpacing(14);
 
-    layout->addWidget(pageTitle(tr("Analisi delle spese"), page));
+    auto *header = new QHBoxLayout;
+    header->addWidget(pageTitle(tr("Analisi delle spese"), page));
+    header->addStretch();
+    m_analysisPeriod = new QComboBox(page);
+    m_analysisPeriod->setObjectName(QStringLiteral("analysisPeriod"));
+    polishComboPopup(m_analysisPeriod);
+    m_analysisPeriod->addItem(tr("Ultimo mese"), 1);
+    m_analysisPeriod->addItem(tr("Ultimi 3 mesi"), 3);
+    m_analysisPeriod->addItem(tr("Ultimi 6 mesi"), 6);
+    m_analysisPeriod->addItem(tr("Tutti i periodi"), 0);
+    QSettings settings;
+    m_analysisMonths = settings.value(QStringLiteral("analysis/months"), 1).toInt();
+    if (m_analysisMonths != 1 && m_analysisMonths != 3 && m_analysisMonths != 6)
+        m_analysisMonths = 1;
+    m_analysisPeriod->setCurrentIndex(m_analysisPeriod->findData(m_analysisMonths));
+    header->addWidget(new QLabel(tr("Periodo:"), page));
+    header->addWidget(m_analysisPeriod);
+    m_analysisPrevious = new QPushButton(QStringLiteral("←"), page);
+    m_analysisPrevious->setObjectName(QStringLiteral("secondaryButton"));
+    m_analysisPrevious->setAccessibleName(tr("Vai al periodo precedente"));
+    m_analysisPrevious->setToolTip(tr("Vai al periodo precedente di un mese"));
+    m_analysisNext = new QPushButton(QStringLiteral("→"), page);
+    m_analysisNext->setObjectName(QStringLiteral("secondaryButton"));
+    m_analysisNext->setAccessibleName(tr("Vai al periodo successivo"));
+    m_analysisNext->setToolTip(tr("Vai al periodo successivo di un mese"));
+    m_analysisPrevious->setFixedWidth(42);
+    m_analysisNext->setFixedWidth(42);
+    header->addWidget(m_analysisPrevious);
+    header->addWidget(m_analysisNext);
+    layout->addLayout(header);
+
     auto *subtitle = new QLabel(
-        tr("Una panoramica di tutte le uscite registrate, suddivise per categoria."),
+        tr("Entrate, uscite e tendenze del conto selezionato, con dettagli per categoria."),
         page);
     subtitle->setObjectName(QStringLiteral("subTitle"));
     subtitle->setTextInteractionFlags(Qt::NoTextInteraction);
     layout->addWidget(subtitle);
 
-    auto *summary = metricCard(
-        tr("Spese complessive · tutti i periodi"),
-        QStringLiteral("expenses"),
-        &m_analysisTotal,
-        page);
-    layout->addWidget(summary);
+    m_analysisDateRange = new QLabel(page);
+    m_analysisDateRange->setObjectName(QStringLiteral("subTitle"));
+    m_analysisDateRange->setTextInteractionFlags(Qt::NoTextInteraction);
+    layout->addWidget(m_analysisDateRange);
+
+    auto *metrics = new QHBoxLayout;
+    metrics->setSpacing(12);
+    metrics->addWidget(metricCard(
+        tr("Totale uscite"), QStringLiteral("expenses"), &m_analysisTotal, page), 1);
+    metrics->addWidget(metricCard(
+        tr("Totale entrate"), QStringLiteral("income"), &m_analysisIncome, page), 1);
+    metrics->addWidget(metricCard(
+        tr("Saldo netto del periodo"), QStringLiteral("balance"), &m_analysisNet, page), 1);
+    metrics->addWidget(metricCard(
+        tr("Media mensile delle uscite"), QStringLiteral("month"), &m_analysisAverage, page), 1);
+    layout->addLayout(metrics);
+
+    auto *insights = new QHBoxLayout;
+    insights->setSpacing(12);
+    auto addInsight = [page, insights](const QString &title, QLabel **value) {
+        auto *card = new QFrame(page);
+        card->setObjectName(QStringLiteral("panel"));
+        card->setMinimumHeight(76);
+        auto *cardLayout = new QVBoxLayout(card);
+        cardLayout->setContentsMargins(15, 10, 15, 10);
+        cardLayout->setSpacing(5);
+        auto *caption = new QLabel(title, card);
+        caption->setObjectName(QStringLiteral("subTitle"));
+        *value = new QLabel(QStringLiteral("—"), card);
+        (*value)->setStyleSheet(QStringLiteral("font-size:12pt;font-weight:700;"));
+        (*value)->setTextInteractionFlags(Qt::NoTextInteraction);
+        cardLayout->addWidget(caption);
+        cardLayout->addWidget(*value);
+        insights->addWidget(card, 1);
+    };
+    addInsight(tr("Categoria con più uscite"), &m_analysisTopCategory);
+    addInsight(tr("Confronto con il periodo precedente"), &m_analysisComparison);
+    addInsight(tr("Movimenti nel periodo"), &m_analysisActivity);
+    layout->addLayout(insights);
+
+    auto *visuals = new QHBoxLayout;
+    visuals->setSpacing(16);
+
+    auto *trendPanel = new QFrame(page);
+    trendPanel->setObjectName(QStringLiteral("panel"));
+    trendPanel->setMinimumHeight(350);
+    auto *trendLayout = new QVBoxLayout(trendPanel);
+    trendLayout->setContentsMargins(20, 18, 20, 16);
+    trendLayout->setSpacing(10);
+    m_analysisTrendTitle = new QLabel(
+        tr("Entrate e uscite · ultimi 6 mesi"), trendPanel);
+    m_analysisTrendTitle->setStyleSheet(QStringLiteral("font-size:14pt;font-weight:700;"));
+    trendLayout->addWidget(m_analysisTrendTitle);
+    m_expenseTrend = new ExpenseTrendChart(trendPanel);
+    trendLayout->addWidget(m_expenseTrend, 1);
+    visuals->addWidget(trendPanel, 3);
 
     auto *panel = new QFrame(page);
     panel->setObjectName(QStringLiteral("panel"));
+    panel->setMinimumHeight(350);
     auto *panelLayout = new QVBoxLayout(panel);
-    panelLayout->setContentsMargins(20, 18, 20, 18);
-    panelLayout->setSpacing(12);
-    auto *heading = new QLabel(tr("Come si distribuiscono le uscite"), panel);
+    panelLayout->setContentsMargins(20, 18, 20, 16);
+    panelLayout->setSpacing(10);
+    auto *heading = new QLabel(tr("Spese per categoria"), panel);
     heading->setStyleSheet(QStringLiteral("font-size:14pt;font-weight:700;"));
     heading->setTextInteractionFlags(Qt::NoTextInteraction);
     panelLayout->addWidget(heading);
 
     auto *content = new QHBoxLayout;
-    content->setSpacing(20);
+    content->setSpacing(12);
     m_expenseDonut = new ExpenseDonutChart(panel);
-    m_expenseDonut->setMinimumWidth(300);
+    m_expenseDonut->setMinimumSize(190, 220);
     content->addWidget(m_expenseDonut, 2);
-
     m_analysisTable = makeTable(
-        {QString(), tr("Categoria"), tr("Totale"), tr("Quota")},
-        panel);
+        {QString(), tr("Categoria"), tr("Totale"), tr("Quota")}, panel);
     m_analysisTable->setObjectName(QStringLiteral("analysisTable"));
     m_analysisTable->setSelectionMode(QAbstractItemView::NoSelection);
     m_analysisTable->setFocusPolicy(Qt::NoFocus);
-    m_analysisTable->verticalHeader()->setDefaultSectionSize(48);
+    m_analysisTable->verticalHeader()->setDefaultSectionSize(44);
     m_analysisTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
     m_analysisTable->setColumnWidth(0, 28);
     m_analysisTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_analysisTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
     m_analysisTable->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
+    m_analysisTable->setMinimumWidth(250);
     content->addWidget(m_analysisTable, 3);
     panelLayout->addLayout(content, 1);
 
@@ -2222,16 +2500,38 @@ QWidget *MainWindow::buildAnalysisPage()
     m_analysisEmpty->setTextInteractionFlags(Qt::NoTextInteraction);
     m_analysisEmpty->hide();
     panelLayout->addWidget(m_analysisEmpty);
-    layout->addWidget(panel, 1);
+    visuals->addWidget(panel, 2);
+    layout->addLayout(visuals, 1);
 
-    auto *note = new QLabel(
-        tr("Le percentuali sono calcolate sul totale delle uscite salvate e possono non sommare esattamente al 100% per arrotondamento."),
-        page);
-    note->setObjectName(QStringLiteral("subTitle"));
-    note->setWordWrap(true);
-    note->setTextInteractionFlags(Qt::NoTextInteraction);
-    layout->addWidget(note);
-    return page;
+    connect(m_analysisPeriod, qOverload<int>(&QComboBox::currentIndexChanged),
+            this, [this](int index) {
+        if (index >= 0) {
+            const int months = m_analysisPeriod->currentData().toInt();
+            if (months > 0) {
+                m_analysisMonths = months;
+                m_analysisMonthOffset = 0;
+                QSettings settings;
+                settings.setValue(QStringLiteral("analysis/months"), months);
+                settings.sync();
+                if (settings.status() != QSettings::NoError)
+                    showError(tr("Impossibile salvare il periodo di analisi."));
+            }
+        }
+        refreshAnalysis();
+    });
+    connect(m_analysisPrevious, &QPushButton::clicked, this, [this] {
+        if (m_analysisMonthOffset < 1200) {
+            ++m_analysisMonthOffset;
+            refreshAnalysis();
+        }
+    });
+    connect(m_analysisNext, &QPushButton::clicked, this, [this] {
+        if (m_analysisMonthOffset > 0) {
+            --m_analysisMonthOffset;
+            refreshAnalysis();
+        }
+    });
+    return scrollArea;
 }
 
 QWidget *MainWindow::buildAppearancePage()
@@ -2498,38 +2798,145 @@ void MainWindow::refreshAll()
 
 void MainWindow::refreshDashboard()
 {
+    if (!m_recentTable || !m_dashboardAccountsTable || !m_dashboardTrend)
+        return;
+
     QList<Transaction> all;
     if (!m_manager.getTransactions(m_accountId, all)) {
         showError(m_manager.lastError());
         return;
     }
-    qint64 income = 0;
-    qint64 expenses = 0;
+    auto addChecked = [](qint64 &total, qint64 amount) {
+        if (amount > std::numeric_limits<qint64>::max() - total)
+            return false;
+        total += amount;
+        return true;
+    };
+
+    const QDate today = QDate::currentDate();
+    const QDate monthStartDate(today.year(), today.month(), 1);
+    const QDate firstTrendMonth = monthStartDate.addMonths(-5);
+    qint64 monthIncome = 0;
+    qint64 monthExpenses = 0;
+    QList<qint64> monthlyIncome(6, 0);
+    QList<qint64> monthlyExpenses(6, 0);
+    QStringList monthLabels;
+    for (int index = 0; index < 6; ++index) {
+        monthLabels.append(
+            firstTrendMonth.addMonths(index).toString(QStringLiteral("MMM")));
+    }
+
     QList<Transaction> recent;
     for (const Transaction &transaction : all) {
-        if (transaction.isIncome())
-            income += transaction.getAmount();
-        else
-            expenses += transaction.getAmount();
-        if (transaction.getDate() >= QDate::currentDate().addDays(-30).toString(Qt::ISODate))
+        const QDate date = QDate::fromString(transaction.getDate(), Qt::ISODate);
+        if (!date.isValid())
+            continue;
+        if (date <= today)
             recent.append(transaction);
+
+        if (date >= monthStartDate && date <= today) {
+            qint64 &monthTotal = transaction.isIncome() ? monthIncome : monthExpenses;
+            if (!addChecked(monthTotal, transaction.getAmount())) {
+                showError(tr("Il totale mensile supera l'intervallo supportato."));
+                return;
+            }
+        }
+
+        const int monthIndex = (date.year() - firstTrendMonth.year()) * 12 +
+                               date.month() - firstTrendMonth.month();
+        if (date <= today && monthIndex >= 0 && monthIndex < 6) {
+            qint64 &monthlyTotal = transaction.isIncome()
+                ? monthlyIncome[monthIndex]
+                : monthlyExpenses[monthIndex];
+            if (!addChecked(monthlyTotal, transaction.getAmount())) {
+                showError(tr("Il totale mensile supera l'intervallo supportato."));
+                return;
+            }
+        }
     }
     qint64 balance = 0;
     if (!m_manager.getAccountBalance(m_accountId, balance)) {
         showError(m_manager.lastError());
         return;
     }
-    qint64 monthExpenses = 0;
-    const QString monthStart = QDate(QDate::currentDate().year(), QDate::currentDate().month(), 1)
-                                   .toString(Qt::ISODate);
-    for (const Transaction &transaction : all) {
-        if (!transaction.isIncome() && transaction.getDate() >= monthStart)
-            monthExpenses += transaction.getAmount();
+
+    QList<QVariantMap> accounts;
+    if (!m_manager.getAccounts(accounts)) {
+        showError(tr("Impossibile caricare i saldi dei conti: %1")
+                      .arg(m_manager.lastError()));
+        return;
     }
+    std::stable_sort(accounts.begin(), accounts.end(),
+                     [](const QVariantMap &a, const QVariantMap &b) {
+        const QString aType = a.value(QStringLiteral("Type")).toString();
+        const QString bType = b.value(QStringLiteral("Type")).toString();
+        if (aType != bType)
+            return aType < bType;
+        return a.value(QStringLiteral("Name")).toString().toCaseFolded() <
+               b.value(QStringLiteral("Name")).toString().toCaseFolded();
+    });
+    qint64 combinedBalance = 0;
+    m_dashboardAccountsTable->setRowCount(accounts.size());
+    for (int row = 0; row < accounts.size(); ++row) {
+        const QVariantMap &account = accounts.at(row);
+        const int accountId = account.value(QStringLiteral("ID_Account")).toInt();
+        const QString name = account.value(QStringLiteral("Name")).toString();
+        const QString type = account.value(QStringLiteral("Type")).toString();
+        const qint64 accountBalance =
+            account.value(QStringLiteral("Balance")).toLongLong();
+        if ((accountBalance > 0 &&
+             combinedBalance > std::numeric_limits<qint64>::max() - accountBalance) ||
+            (accountBalance < 0 &&
+             combinedBalance < std::numeric_limits<qint64>::min() - accountBalance)) {
+            showError(tr("Il saldo complessivo dei conti supera l'intervallo supportato."));
+            return;
+        }
+        combinedBalance += accountBalance;
+
+        auto *accountName = cell(name);
+        auto *accountTypeCell = cell(accountTypeLabel(type));
+        accountTypeCell->setIcon(accountTypeIcon(type));
+        accountTypeCell->setForeground(accountTypeColor(type));
+        auto *accountAmount = cell(
+            money(accountBalance), Qt::AlignRight | Qt::AlignVCenter);
+        if (accountId == m_accountId) {
+            const QColor accent = QColor(m_themeModeKey == QStringLiteral("light")
+                                             ? QStringLiteral("#6d28d9")
+                                             : QStringLiteral("#a78bfa"));
+            accountName->setForeground(accent);
+            accountAmount->setForeground(accent);
+            QFont activeFont = accountName->font();
+            activeFont.setWeight(QFont::DemiBold);
+            accountName->setFont(activeFont);
+            accountAmount->setFont(activeFont);
+        }
+        m_dashboardAccountsTable->setItem(row, 0, accountName);
+        m_dashboardAccountsTable->setItem(row, 1, accountTypeCell);
+        m_dashboardAccountsTable->setItem(row, 2, accountAmount);
+    }
+    m_dashboardTotalBalance->setText(money(combinedBalance));
+
     m_balanceValue->setText(money(balance));
-    m_incomeValue->setText(money(income));
-    m_expensesValue->setText(money(expenses));
-    m_monthValue->setText(money(monthExpenses));
+    const qint64 monthNet = monthIncome - monthExpenses;
+    m_incomeValue->setText(money(monthIncome));
+    m_expensesValue->setText(money(monthExpenses));
+    m_monthValue->setText(money(monthNet));
+    const QColor monthNetColor = monthNet > 0
+        ? incomeTextColor(m_themeModeKey == QStringLiteral("light"))
+        : (monthNet < 0
+               ? expenseTextColor(m_themeModeKey == QStringLiteral("light"))
+               : palette().color(QPalette::WindowText));
+    m_monthValue->setStyleSheet(
+        QStringLiteral("color:%1;").arg(monthNetColor.name()));
+
+    const bool lightMode = m_themeModeKey == QStringLiteral("light");
+    m_dashboardTrend->setData(
+        monthLabels, monthlyIncome, monthlyExpenses,
+        incomeTextColor(lightMode), expenseTextColor(lightMode),
+        QColor(lightMode ? QStringLiteral("#172033") : QStringLiteral("#f8fafc")),
+        QColor(lightMode ? QStringLiteral("#526176") : QStringLiteral("#c0ccda")),
+        QColor(lightMode ? QStringLiteral("#d8e0ea") : QStringLiteral("#334155")));
+
     QString balanceColor = QStringLiteral("#67e8f9");
     if (m_themeModeKey == QStringLiteral("light")) {
         balanceColor = balance < 0 ? QStringLiteral("#b91c1c")
@@ -2608,7 +3015,7 @@ void MainWindow::renderTransactionsPage()
         const QString amount = money(transaction.getAmount());
         const QString localizedAmount = QLocale().toString(
             static_cast<double>(transaction.getAmount()) / 100.0, 'f', 2);
-        const QString searchable = QStringLiteral("%1 %2 %3 %4 %5 %6 %7 %8")
+        const QString searchable = QStringLiteral("%1 %2 %3 %4 %5 %6 %7 %8 %9")
             .arg(categoryName(transaction.getCategoryId()),
                  type,
                  transaction.getDate(),
@@ -2617,7 +3024,8 @@ void MainWindow::renderTransactionsPage()
                  amount,
                  localizedAmount,
                  QString::number(static_cast<double>(transaction.getAmount()) / 100.0, 'f', 2),
-                 QString::number(transaction.getId()));
+                 QString::number(transaction.getId()),
+                 transaction.getNotes());
         if (search.isEmpty() || searchable.contains(search, Qt::CaseInsensitive))
             m_visibleTransactions.append(transaction);
     }
@@ -2672,7 +3080,10 @@ void MainWindow::renderTransactionsPage()
         amountFont.setWeight(QFont::Bold);
         amount->setFont(amountFont);
         m_transactionsTable->setItem(row, 3, amount);
-        m_transactionsTable->setItem(row, 4, cell(QString::number(t.getId())));
+        auto *notes = cell(t.getNotes());
+        notes->setToolTip(t.getNotes());
+        m_transactionsTable->setItem(row, 4, notes);
+        m_transactionsTable->setItem(row, 5, cell(QString::number(t.getId())));
         m_transactionsTable->item(row, 0)->setToolTip(t.getDate());
         m_transactionsTable->item(row, 1)->setToolTip(
             tr("%1 · %2")
@@ -2722,7 +3133,7 @@ void MainWindow::refreshCategories()
 
 void MainWindow::refreshAnalysis()
 {
-    if (!m_analysisTable || !m_expenseDonut)
+    if (!m_analysisTable || !m_expenseDonut || !m_analysisPeriod || !m_expenseTrend)
         return;
 
     QList<Transaction> transactions;
@@ -2731,21 +3142,75 @@ void MainWindow::refreshAnalysis()
         return;
     }
 
+    const QString accountType =
+        m_accountSelector->currentData(Qt::UserRole + 1).toString();
+    const bool allTimeAccount =
+        accountType == QStringLiteral("cash") ||
+        accountType == QStringLiteral("savings");
+    m_analysisPrevious->setEnabled(!allTimeAccount && m_analysisMonthOffset < 1200);
+    m_analysisNext->setEnabled(!allTimeAccount && m_analysisMonthOffset > 0);
+    const int savedMonths = m_analysisPeriod->currentData().toInt();
+    m_analysisPeriod->setEnabled(!allTimeAccount);
+    if (savedMonths > 0)
+        m_analysisMonths = savedMonths;
+    const int months = allTimeAccount ? 0 : m_analysisMonths;
+    const int selectedPeriodIndex = m_analysisPeriod->findData(
+        allTimeAccount ? 0 : months);
+    if (selectedPeriodIndex >= 0 &&
+        selectedPeriodIndex != m_analysisPeriod->currentIndex()) {
+        const QSignalBlocker blocker(m_analysisPeriod);
+        m_analysisPeriod->setCurrentIndex(selectedPeriodIndex);
+    }
+    const int previousIndex = m_analysisPeriod->findData(0);
+    if (previousIndex >= 0) {
+        auto *model = qobject_cast<QStandardItemModel *>(m_analysisPeriod->model());
+        if (model && model->item(previousIndex))
+            model->item(previousIndex)->setEnabled(allTimeAccount);
+    }
+
+    const QDate today = QDate::currentDate();
+    const QDate currentMonthStart(today.year(), today.month(), 1);
+    const QDate periodMonthStart =
+        currentMonthStart.addMonths(-m_analysisMonthOffset);
+    const QDate startDate = months > 0
+        ? periodMonthStart.addMonths(1 - months)
+        : QDate();
+    const QDate periodEnd = months > 0
+        ? (m_analysisMonthOffset == 0
+               ? today
+               : periodMonthStart.addMonths(1).addDays(-1))
+        : today;
+    QList<Transaction> selectedTransactions;
+    selectedTransactions.reserve(transactions.size());
+    for (const Transaction &transaction : transactions) {
+        const QDate date = QDate::fromString(transaction.getDate(), Qt::ISODate);
+        if (date.isValid() &&
+            (months == 0 || (date >= startDate && date <= periodEnd)))
+            selectedTransactions.append(transaction);
+    }
+
     QHash<int, qint64> totalsByCategory;
     qint64 totalExpenses = 0;
-    for (const Transaction &transaction : transactions) {
-        if (transaction.isIncome())
-            continue;
-
-        const qint64 amount = transaction.getAmount();
-        qint64 &categoryTotal = totalsByCategory[transaction.getCategoryId()];
-        if (amount > std::numeric_limits<qint64>::max() - categoryTotal ||
-            amount > std::numeric_limits<qint64>::max() - totalExpenses) {
-            showError(tr("Il totale delle uscite supera l'intervallo supportato."));
+    qint64 totalIncome = 0;
+    auto addChecked = [](qint64 &total, qint64 amount) {
+        if (amount > std::numeric_limits<qint64>::max() - total)
+            return false;
+        total += amount;
+        return true;
+    };
+    for (const Transaction &transaction : selectedTransactions) {
+        qint64 &total = transaction.isIncome() ? totalIncome : totalExpenses;
+        if (!addChecked(total, transaction.getAmount())) {
+            showError(tr("Il totale delle transazioni supera l'intervallo supportato."));
             return;
         }
-        categoryTotal += amount;
-        totalExpenses += amount;
+        if (!transaction.isIncome()) {
+            qint64 &categoryTotal = totalsByCategory[transaction.getCategoryId()];
+            if (!addChecked(categoryTotal, transaction.getAmount())) {
+                showError(tr("Il totale delle uscite supera l'intervallo supportato."));
+                return;
+            }
+        }
     }
 
     QList<QPair<QString, qint64>> segments;
@@ -2756,6 +3221,134 @@ void MainWindow::refreshAnalysis()
     });
 
     m_analysisTotal->setText(money(totalExpenses));
+    m_analysisIncome->setText(money(totalIncome));
+    m_analysisNet->setText(money(totalIncome - totalExpenses));
+    QDate earliestDate;
+    for (const Transaction &transaction : selectedTransactions) {
+        const QDate date = QDate::fromString(transaction.getDate(), Qt::ISODate);
+        if (date.isValid() && date <= periodEnd &&
+            (!earliestDate.isValid() || date < earliestDate)) {
+            earliestDate = date;
+        }
+    }
+    const QDate averageStartDate = months > 0 ? startDate : earliestDate;
+    if (months == 0 && !earliestDate.isValid()) {
+        m_analysisDateRange->setText(tr("Nessuna transazione registrata."));
+        m_analysisAverage->setText(money(0));
+    } else {
+        m_analysisDateRange->setText(
+            months > 0
+                ? tr("Periodo analizzato: %1 – %2")
+                      .arg(QLocale().toString(startDate, QLocale::LongFormat),
+                           QLocale().toString(periodEnd, QLocale::LongFormat))
+                : tr("Periodo analizzato: tutte le transazioni (%1 – %2)")
+                      .arg(QLocale().toString(earliestDate, QLocale::LongFormat),
+                           QLocale().toString(periodEnd, QLocale::LongFormat)));
+        const qint64 elapsedDays = averageStartDate.daysTo(periodEnd) + 1;
+        const long double elapsedMonths =
+            static_cast<long double>(elapsedDays) * 12.0L / 365.2425L;
+        const long double monthlyAverage =
+            elapsedMonths > 0
+                ? static_cast<long double>(totalExpenses) / elapsedMonths
+                : 0.0L;
+        if (monthlyAverage > std::numeric_limits<qint64>::max() - 1.0L) {
+            showError(tr("La media mensile supera l'intervallo supportato."));
+            return;
+        }
+        m_analysisAverage->setText(
+            money(static_cast<qint64>(monthlyAverage + 0.5L)));
+    }
+
+    if (segments.isEmpty()) {
+        m_analysisTopCategory->setText(tr("Nessuna spesa"));
+    } else {
+        const double topShare = totalExpenses > 0
+            ? static_cast<double>(
+                  static_cast<long double>(segments.first().second) * 100.0L /
+                  totalExpenses)
+            : 0.0;
+        m_analysisTopCategory->setText(
+            QStringLiteral("%1 · %2%")
+                .arg(segments.first().first,
+                     QLocale().toString(topShare, 'f', 1)));
+    }
+    if (months == 0) {
+        m_analysisComparison->setText(
+            tr("Confronto non disponibile per l'intero periodo"));
+    } else {
+        const QDate previousEnd = startDate.addDays(-1);
+        const QDate previousStart = startDate.addMonths(-months);
+        qint64 previousExpenses = 0;
+        for (const Transaction &transaction : transactions) {
+            if (transaction.isIncome())
+                continue;
+            const QDate date = QDate::fromString(transaction.getDate(), Qt::ISODate);
+            if (date >= previousStart && date <= previousEnd &&
+                !addChecked(previousExpenses, transaction.getAmount())) {
+                showError(tr("Il totale delle uscite supera l'intervallo supportato."));
+                return;
+            }
+        }
+        if (previousExpenses == 0) {
+            m_analysisComparison->setText(
+                totalExpenses > 0 ? tr("Nuove uscite nel periodo")
+                                  : tr("Nessuna uscita nei due periodi"));
+        } else {
+            const long double change =
+                (static_cast<long double>(totalExpenses) - previousExpenses) *
+                100.0L / previousExpenses;
+            const QString sign = change > 0 ? QStringLiteral("+") : QString();
+            m_analysisComparison->setText(
+                QStringLiteral("%1% · %2")
+                .arg(sign + QLocale().toString(static_cast<double>(change), 'f', 1),
+                         tr("rispetto al periodo precedente")));
+        }
+    }
+    const int expenseCount = static_cast<int>(std::count_if(
+        selectedTransactions.cbegin(), selectedTransactions.cend(),
+        [](const Transaction &transaction) { return !transaction.isIncome(); }));
+    m_analysisActivity->setText(
+        tr("%1 movimenti · %2 uscite")
+            .arg(selectedTransactions.size())
+            .arg(expenseCount));
+
+    const QDate firstTrendMonth =
+        QDate(periodEnd.year(), periodEnd.month(), 1).addMonths(-5);
+    const int trendMonthCount =
+        (periodEnd.year() - firstTrendMonth.year()) * 12 +
+        periodEnd.month() - firstTrendMonth.month() + 1;
+    m_analysisTrendTitle->setText(
+        tr("Entrate e uscite · 6 mesi fino a %1")
+            .arg(QLocale().toString(periodEnd, QStringLiteral("MMMM yyyy"))));
+    QStringList monthLabels;
+    QList<qint64> monthlyIncome(trendMonthCount, 0);
+    QList<qint64> monthlyExpenses(trendMonthCount, 0);
+    for (int index = 0; index < trendMonthCount; ++index)
+        monthLabels.append(firstTrendMonth.addMonths(index).toString(QStringLiteral("MMM")));
+    for (const Transaction &transaction : transactions) {
+        const QDate date = QDate::fromString(transaction.getDate(), Qt::ISODate);
+        if (!date.isValid() || date < firstTrendMonth || date > periodEnd)
+            continue;
+        const int index = (date.year() - firstTrendMonth.year()) * 12 +
+                          date.month() - firstTrendMonth.month();
+        if (index < 0 || index >= trendMonthCount)
+            continue;
+        qint64 &monthlyTotal = transaction.isIncome()
+            ? monthlyIncome[index]
+            : monthlyExpenses[index];
+        if (!addChecked(monthlyTotal, transaction.getAmount())) {
+            showError(tr("Il totale mensile supera l'intervallo supportato."));
+            return;
+        }
+    }
+    const bool lightMode = m_themeModeKey == QStringLiteral("light");
+    m_expenseTrend->setData(
+        monthLabels, monthlyIncome, monthlyExpenses,
+        incomeTextColor(lightMode), expenseTextColor(lightMode),
+        QColor(lightMode ? QStringLiteral("#172033") : QStringLiteral("#f8fafc")),
+        QColor(lightMode ? QStringLiteral("#526176") : QStringLiteral("#c0ccda")),
+        QColor(lightMode ? QStringLiteral("#d8e0ea") : QStringLiteral("#334155")));
+
     m_expenseDonut->setData(segments, totalExpenses);
     const bool hasExpenses = totalExpenses > 0;
     m_expenseDonut->setVisible(hasExpenses);
@@ -2814,7 +3407,7 @@ void MainWindow::editTransaction()
         QMessageBox::information(this, tr("Seleziona una transazione"), tr("Seleziona una riga da modificare."));
         return;
     }
-    const int id = m_transactionsTable->item(row, 4)->text().toInt();
+    const int id = m_transactionsTable->item(row, 5)->text().toInt();
     QList<Transaction> transactions;
     if (!m_manager.getTransactions(m_accountId, transactions, currentFilter())) {
         showError(m_manager.lastError());
@@ -2844,7 +3437,7 @@ void MainWindow::deleteTransaction()
         QMessageBox::information(this, tr("Seleziona una transazione"), tr("Seleziona una riga da eliminare."));
         return;
     }
-    const int id = m_transactionsTable->item(row, 4)->text().toInt();
+    const int id = m_transactionsTable->item(row, 5)->text().toInt();
     if (QMessageBox::question(this, tr("Conferma eliminazione"),
                               tr("Vuoi eliminare questa transazione? Il saldo verrà aggiornato.")) != QMessageBox::Yes)
         return;

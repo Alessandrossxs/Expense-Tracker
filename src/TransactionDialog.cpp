@@ -9,6 +9,7 @@
 #include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QMessageBox>
+#include <QPlainTextEdit>
 #include <QVBoxLayout>
 #include <QtMath>
 
@@ -39,11 +40,16 @@ TransactionDialog::TransactionDialog(
     m_amount->setSingleStep(1.0);
     m_amount->setSuffix(QStringLiteral(" €"));
 
+    m_notes = new QPlainTextEdit(this);
+    m_notes->setPlaceholderText(tr("Aggiungi dettagli utili (facoltativo)"));
+    m_notes->setMinimumHeight(82);
+
     auto *form = new QFormLayout;
     form->addRow(tr("Tipo"), m_type);
     form->addRow(tr("Categoria"), m_category);
     form->addRow(tr("Data"), m_date);
     form->addRow(tr("Importo"), m_amount);
+    form->addRow(tr("Note"), m_notes);
 
     auto *buttons = new QDialogButtonBox(
         QDialogButtonBox::Save | QDialogButtonBox::Cancel, this);
@@ -92,6 +98,7 @@ void TransactionDialog::setTransaction(const Transaction &transaction)
     reloadCategories(transaction.getCategoryId());
     m_date->setDate(QDate::fromString(transaction.getDate(), Qt::ISODate));
     m_amount->setValue(static_cast<double>(transaction.getAmount()) / 100.0);
+    m_notes->setPlainText(transaction.getNotes());
     setWindowTitle(tr("Modifica transazione"));
 }
 
@@ -104,5 +111,6 @@ Transaction TransactionDialog::transaction() const
         m_category->currentData().toInt(),
         m_date->date().toString(Qt::ISODate),
         cents,
-        m_type->currentData().toBool());
+        m_type->currentData().toBool(),
+        m_notes->toPlainText().trimmed());
 }

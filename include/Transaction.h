@@ -11,6 +11,7 @@ private:
     QString m_date;       ///< Date of the transaction in ISO format (YYYY-MM-DD).
     qint64 m_amount = 0;  ///< Amount of the transaction in cents.
     bool m_isIncome = false; ///< True for income and false for expense.
+    QString m_notes;
 
 public:
     /**
@@ -33,7 +34,8 @@ public:
         int categoryId,
         const QString &date,
         qint64 amount,
-        bool isIncome);
+        bool isIncome,
+        const QString &notes = QString());
 
     /**
      * @brief Returns the transaction ID.
@@ -70,6 +72,7 @@ public:
      * @return True for income and false for expense.
      */
     bool isIncome() const;
+    QString getNotes() const;
 
     /**
      * @brief Sets the transaction ID.
@@ -106,4 +109,5 @@ public:
      * @param isIncome True for income and false for expense.
      */
     void setIncome(bool isIncome);
+    void setNotes(const QString &notes);
 };

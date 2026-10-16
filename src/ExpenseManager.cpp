@@ -169,7 +169,7 @@ bool ExpenseManager::exportTransactionsToCsv(
 
     QTextStream stream(&file);
     stream.setEncoding(QStringConverter::Utf8);
-    stream << "transaction_id,account_id,category_id,date,type,amount_cents\n";
+    stream << "transaction_id,account_id,category_id,date,type,amount_cents,notes\n";
     for (const Transaction &transaction : transactions) {
         stream << csvField(QString::number(transaction.getId())) << ','
                << csvField(QString::number(transaction.getAccountId())) << ','
@@ -177,7 +177,8 @@ bool ExpenseManager::exportTransactionsToCsv(
                << csvField(transaction.getDate()) << ','
                << csvField(transaction.isIncome() ? QStringLiteral("income")
                                                    : QStringLiteral("expense"))
-               << ',' << csvField(QString::number(transaction.getAmount())) << '\n';
+               << ',' << csvField(QString::number(transaction.getAmount())) << ','
+               << csvField(transaction.getNotes()) << '\n';
     }
     stream.flush();
     if (stream.status() != QTextStream::Ok) {
