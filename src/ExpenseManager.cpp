@@ -10,9 +10,25 @@ namespace
 {
 QString csvField(const QString &value)
 {
-    QString escaped = value;
-    escaped.replace(QLatin1Char('"'), QStringLiteral("\"\""));
-    return QLatin1Char('"') + escaped + QLatin1Char('"');
+    // CSV quoting prevents delimiter/quote breakout, but not spreadsheet formula execution.
+    // Prefix formula-like values with a tab inside the quoted cell for safer human viewing
+    // in spreadsheet applications. The tab is intentionally preserved in exported data.
+    QString safeValue = value;
+    const QString trimmed = safeValue.trimmed();
+    if (!trimmed.isEmpty()) {
+        const QChar first = trimmed.front();
+        if (first == QLatin1Char('=') || first == QLatin1Char('+') ||
+            first == QLatin1Char('-') || first == QLatin1Char('@') ||
+            first == QChar(0xFF1D) || first == QChar(0xFF0B) ||
+            first == QChar(0xFF0D) || first == QChar(0xFF20) ||
+            first == QLatin1Char('\t') || first == QLatin1Char('\r') ||
+            first == QLatin1Char('\n')) {
+            safeValue.prepend(QLatin1Char('\t'));
+        }
+    }
+
+    safeValue.replace(QLatin1Char('"'), QStringLiteral("\"\""));
+    return QLatin1Char('"') + safeValue + QLatin1Char('"');
 }
 }
 
