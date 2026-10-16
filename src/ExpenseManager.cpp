@@ -30,11 +30,11 @@ QString csvField(const QString &value)
         if (formulaLike) {
             // Insert immediately before the first non-whitespace character. This
             // also handles values with leading spaces without moving those spaces.
-            safeValue.insert(firstNonWhitespace, QLatin1Char('\\t'));
+            safeValue.insert(firstNonWhitespace, QLatin1Char('\t'));
         }
     }
 
-    safeValue.replace(QLatin1Char('"'), QStringLiteral("\\"\\""));
+    safeValue.replace(QLatin1Char('"'), QStringLiteral("\"\""));
     return QLatin1Char('"') + safeValue + QLatin1Char('"');
 }
 }
