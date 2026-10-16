@@ -33,6 +33,14 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    Database emptyPathDatabase(QString());
+    if (!expect(!emptyPathDatabase.open(),
+                QStringLiteral("An empty database path must not open a temporary database")) ||
+        !expect(!emptyPathDatabase.lastError().isEmpty(),
+                QStringLiteral("An empty database path did not report an error"))) {
+        return 1;
+    }
+
     Database database(temporaryDirectory.filePath(QStringLiteral("database-test.sqlite")));
     if (!expect(database.open(), database.lastError())) {
         return 1;
