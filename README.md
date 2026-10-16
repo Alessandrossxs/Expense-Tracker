@@ -71,9 +71,14 @@ databases. The setup and uninstaller run under the current PowerShell execution
 policy; neither script overrides it.
 
 The SQLite database is stored as a normal local file and is not encrypted by
-the application. Protect it with your Windows account and device security
-(including full-disk encryption where available), and keep backups in a secure
-location. The installer is not code-signed, so obtain it only from a trusted
+the application. Expense Tracker is a local ledger, not a multi-user security
+boundary: selecting an account does not authenticate a user or restrict access
+to that account's data. The legacy `Password_Hash` database column is retained
+for compatibility and is not used for authentication. Anyone who can read the
+database file can read or modify its contents. Protect it with your operating
+system account and device security (including full-disk encryption where
+available), and keep backups in a secure location. CSV exports are also
+unencrypted. The installer is not code-signed, so obtain it only from a trusted
 release source.
 
 ## Amounts, accounts, and filters
@@ -97,10 +102,12 @@ protected by your Windows account and device encryption.
 ## Application entry point
 
 The Qt interface is implemented in `src/MainWindow.cpp` and launched by
-`src/main.cpp`. The application uses the existing workspace database when it is
-available, regardless of the process working directory, so starting the built
-executable does not silently open a different database. Appearance settings,
-including language, are saved locally.
+`src/main.cpp`. The application stores its database in the per-user application data
+directory. On first launch after this change, it attempts to copy an existing
+legacy database from the previous workspace/current-directory locations; the
+source file is kept as a backup. If migration fails, the app continues using the
+legacy file rather than silently creating an empty database. Appearance
+settings, including language, are saved locally.
 Choose Italian or English in the Appearance page; the new language takes effect
 the next time the application starts.
 
