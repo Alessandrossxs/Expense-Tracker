@@ -227,6 +227,49 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    // Regression tests: balance overflow must reject the operation and roll back
+    // every partial change, including a transfer's source-account debit.
+    int maximumBalanceAccountId = 0;
+    const qint64 maximumBalance = std::numeric_limits<qint64>::max();
+    if (!expect(
+            database.addAccount(
+                QStringLiteral("Maximum balance account"),
+                QStringLiteral("test-hash"),
+                QStringLiteral("2026-01-08"),
+                maximumBalance,
+                &maximumBalanceAccountId),
+            database.lastError())) {
+        return 1;
+    }
+
+    const Transaction overflowingIncome(
+        0, maximumBalanceAccountId, incomeCategoryId,
+        QStringLiteral("2026-01-09"), 1, true);
+    if (!expect(
+            !database.addTransaction(overflowingIncome),
+            QStringLiteral("Transaction that overflows account balance was accepted")) ||
+        !expect(database.getAccountBalance(maximumBalanceAccountId, secondBalance),
+                database.lastError()) ||
+        !expect(secondBalance == maximumBalance,
+                QStringLiteral("Rejected transaction changed maximum account balance"))) {
+        return 1;
+    }
+
+    if (!expect(
+            !database.addTransfer(
+                firstAccountId, maximumBalanceAccountId,
+                QStringLiteral("2026-01-09"), 1),
+            QStringLiteral("Transfer that overflows destination balance was accepted")) ||
+        !expect(database.getAccountBalance(firstAccountId, firstBalance), database.lastError()) ||
+        !expect(database.getAccountBalance(maximumBalanceAccountId, secondBalance),
+                database.lastError()) ||
+        !expect(firstBalance == 11000,
+                QStringLiteral("Failed transfer did not roll back source-account debit")) ||
+        !expect(secondBalance == maximumBalance,
+                QStringLiteral("Failed transfer changed destination account balance"))) {
+        return 1;
+    }
+
     const Statistics statistics({income, expense});
     if (!expect(statistics.getTotalIncome() == 2000, QStringLiteral("Income total is incorrect")) ||
         !expect(statistics.getTotalExpenses() == 3000, QStringLiteral("Expense total is incorrect")) ||
