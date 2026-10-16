@@ -35,9 +35,9 @@ QString csvField(const QString &value)
                     first == QChar(0xFF1D) || first == QChar(0xFF0B) ||
                     first == QChar(0xFF0D) || first == QChar(0xFF20);
                 if (formulaLike) {
-                    // Keep leading spaces, but put the neutralizing tab directly
-                    // before the first non-whitespace character.
-                    safeValue.insert(firstNonWhitespace, QLatin1Char('\t'));
+                    // Put the neutralizing tab at the start of the cell so it remains
+                    // the first character even when the original value has whitespace.
+                    safeValue.prepend(QLatin1Char('\t'));
                 }
             }
         }
