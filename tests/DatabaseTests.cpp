@@ -41,6 +41,37 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    // A damaged existing file must be rejected without replacing its contents.
+    const QString corruptDatabasePath =
+        temporaryDirectory.filePath(QStringLiteral("corrupt.sqlite"));
+    const QByteArray corruptDatabaseContents =
+        QByteArrayLiteral("not a valid SQLite database");
+    QFile corruptDatabaseFile(corruptDatabasePath);
+    if (!expect(corruptDatabaseFile.open(QIODevice::WriteOnly),
+                corruptDatabaseFile.errorString()) ||
+        !expect(corruptDatabaseFile.write(corruptDatabaseContents) ==
+                    corruptDatabaseContents.size(),
+                QStringLiteral("Could not prepare corrupt database test file"))) {
+        return 1;
+    }
+    corruptDatabaseFile.close();
+
+    Database corruptDatabase(corruptDatabasePath);
+    if (!expect(!corruptDatabase.open(),
+                QStringLiteral("Corrupt database was accepted")) ||
+        !expect(!corruptDatabase.isOpen(),
+                QStringLiteral("Corrupt database connection remained open"))) {
+        return 1;
+    }
+    QFile preservedCorruptDatabase(corruptDatabasePath);
+    if (!expect(preservedCorruptDatabase.open(QIODevice::ReadOnly),
+                preservedCorruptDatabase.errorString()) ||
+        !expect(preservedCorruptDatabase.readAll() == corruptDatabaseContents,
+                QStringLiteral("Corrupt database file was modified during open"))) {
+        return 1;
+    }
+    preservedCorruptDatabase.close();
+
     Database database(
         temporaryDirectory.filePath(QStringLiteral("data/database-test.sqlite")));
     if (!expect(database.open(), database.lastError())) {
