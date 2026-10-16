@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QStringList>
 #include <QTemporaryDir>
 #include <iostream>
 #include <limits>
@@ -391,6 +392,39 @@ int main(int argc, char *argv[])
         !expect(!csvContents.contains(QByteArrayLiteral(",\"=1+1\"")),
                 QStringLiteral("CSV contains an unneutralized formula-like value"))) {
         return 1;
+    }
+
+    csvFile.close();
+
+    // Cover common formula prefixes and leading whitespace, not only '=' at column 1.
+    const QStringList formulaPayloads = {
+        QStringLiteral("  =1+1"),
+        QStringLiteral("+1+1"),
+        QStringLiteral("-1+1"),
+        QStringLiteral("@SUM(1,1)"),
+        QString(QChar(0xFF1D)) + QStringLiteral("1+1")
+    };
+    for (const QString &payload : formulaPayloads) {
+        csvFormulaTransaction.setNotes(payload);
+        if (!expect(manager.updateTransaction(csvFormulaTransaction), manager.lastError()) ||
+            !expect(
+                manager.exportTransactionsToCsv(managedAccountId, csvPath, filter),
+                manager.lastError())) {
+            return 1;
+        }
+
+        QFile formulaCsvFile(csvPath);
+        if (!expect(formulaCsvFile.open(QIODevice::ReadOnly), formulaCsvFile.errorString()))
+            return 1;
+        const QByteArray formulaCsvContents = formulaCsvFile.readAll();
+        const QString neutralized = payload.startsWith(QStringLiteral("  "))
+            ? QStringLiteral("  \t=1+1")
+            : QStringLiteral("\t") + payload;
+        if (!expect(
+                formulaCsvContents.contains(neutralized.toUtf8()),
+                QStringLiteral("CSV formula prefix was not neutralized: ") + payload)) {
+            return 1;
+        }
     }
 
     TransactionFilter invalidFilter;
