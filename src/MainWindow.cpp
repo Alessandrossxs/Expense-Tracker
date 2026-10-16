@@ -433,12 +433,12 @@ QString databasePath()
         QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     if (applicationDataDirectory.isEmpty()) {
         qWarning() << "Unable to determine the application data directory";
-        return currentDatabase;
+        return QString();
     }
     if (!QDir().mkpath(applicationDataDirectory)) {
         qWarning() << "Unable to create application data directory:"
                    << applicationDataDirectory;
-        return currentDatabase;
+        return QString();
     }
 
     const QString stableDatabase = QDir(applicationDataDirectory).filePath(fileName);
