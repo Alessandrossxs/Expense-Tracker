@@ -102,12 +102,13 @@ protected by your Windows account and device encryption.
 ## Application entry point
 
 The Qt interface is implemented in `src/MainWindow.cpp` and launched by
-`src/main.cpp`. The application stores its database in the per-user application data
-directory. On first launch after this change, it attempts to copy an existing
-legacy database from the previous workspace/current-directory locations; the
-source file is kept as a backup. If migration fails, the app continues using the
-legacy file rather than silently creating an empty database. Appearance
-settings, including language, are saved locally.
+`src/main.cpp`. The application stores its database in the `data` directory beside
+the executable. On first launch after this change, it attempts to copy an existing
+database from the previous per-user application data location or legacy
+workspace/current-directory locations; the source file is kept as a backup. If
+migration fails, the app continues using the legacy file rather than silently
+creating an empty database. Appearance settings, including language, are saved
+locally.
 Choose Italian or English in the Appearance page; the new language takes effect
 the next time the application starts.
 

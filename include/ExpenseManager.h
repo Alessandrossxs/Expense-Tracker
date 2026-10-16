@@ -16,7 +16,8 @@ private:
     bool recordResult(bool success);
 
 public:
-    explicit ExpenseManager(const QString &databasePath = QStringLiteral("expense_tracker.db"));
+    explicit ExpenseManager(
+        const QString &databasePath = QStringLiteral("data/expense_tracker.db"));
 
     bool open();
     bool isOpen() const;

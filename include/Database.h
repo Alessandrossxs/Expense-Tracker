@@ -27,7 +27,7 @@ private:
 
 public:
     explicit Database(
-        const QString &databasePath = "expense_tracker.db");
+        const QString &databasePath = "data/expense_tracker.db");
 
     ~Database();
 

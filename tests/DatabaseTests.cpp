@@ -41,7 +41,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    Database database(temporaryDirectory.filePath(QStringLiteral("database-test.sqlite")));
+    Database database(
+        temporaryDirectory.filePath(QStringLiteral("data/database-test.sqlite")));
     if (!expect(database.open(), database.lastError())) {
         return 1;
     }

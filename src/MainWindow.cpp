@@ -429,28 +429,27 @@ QString databasePath()
 {
     const QString fileName = QStringLiteral("expense_tracker.db");
     const QString currentDatabase = QDir::current().filePath(fileName);
-    const QString applicationDataDirectory =
-        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    if (applicationDataDirectory.isEmpty()) {
-        qWarning() << "Unable to determine the application data directory";
-        return QString();
-    }
-    if (!QDir().mkpath(applicationDataDirectory)) {
-        qWarning() << "Unable to create application data directory:"
-                   << applicationDataDirectory;
-        return QString();
-    }
+    const QDir applicationDirectory(QCoreApplication::applicationDirPath());
+    const QString dataDirectory = applicationDirectory.filePath(QStringLiteral("data"));
+    const QString stableDatabase = QDir(dataDirectory).filePath(fileName);
 
-    const QString stableDatabase = QDir(applicationDataDirectory).filePath(fileName);
+    if (!QDir().mkpath(dataDirectory)) {
+        qWarning() << "Unable to create database directory:" << dataDirectory;
+        return QString();
+    }
     if (QFileInfo::exists(stableDatabase))
         return stableDatabase;
 
-    // One-time migration from legacy working-directory locations. Copy rather than
-    // move so the original remains available as a backup if anything goes wrong.
-    const QDir applicationDirectory(QCoreApplication::applicationDirPath());
+    const QString previousApplicationDataDirectory =
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    const QString previousApplicationDatabase =
+        QDir(previousApplicationDataDirectory).filePath(fileName);
+
+    // Keep legacy files as backups and avoid silently starting with an empty database.
     const QString workspaceDatabase =
         applicationDirectory.filePath(QStringLiteral("../") + fileName);
-    const QStringList legacyCandidates = {workspaceDatabase, currentDatabase};
+    const QStringList legacyCandidates = {
+        previousApplicationDatabase, workspaceDatabase, currentDatabase};
     for (const QString &legacyPath : legacyCandidates) {
         if (!QFileInfo::exists(legacyPath))
             continue;

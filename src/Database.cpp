@@ -3,6 +3,8 @@
 #include "Transaction.h"
 
 #include <QDate>
+#include <QDir>
+#include <QFileInfo>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QUuid>
@@ -174,6 +176,13 @@ bool Database::open()
     m_lastError.clear();
     if (m_db.databaseName().trimmed().isEmpty()) {
         m_lastError = QStringLiteral("Database path is empty; refusing to open a temporary database");
+        return false;
+    }
+    const QString databaseDirectory = QFileInfo(m_db.databaseName()).path();
+    if (databaseDirectory != QStringLiteral(".") &&
+        !QDir().mkpath(databaseDirectory)) {
+        m_lastError = QStringLiteral("Failed to create database directory: ") +
+                      databaseDirectory;
         return false;
     }
     if (m_db.isOpen()) {
