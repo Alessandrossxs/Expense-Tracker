@@ -15,7 +15,8 @@
 #include <QDate>
 #include <QDateEdit>
 #include <QDoubleSpinBox>
-#include <QFile>\n#include <QFileDialog>
+#include <QFile>
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QFont>
 #include <QFontDatabase>
