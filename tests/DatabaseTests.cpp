@@ -401,6 +401,9 @@ int main(int argc, char *argv[])
     // Cover common formula prefixes and leading whitespace, not only '=' at column 1.
     const QStringList formulaPayloads = {
         QStringLiteral("  =1+1"),
+        QStringLiteral("\t=1+1"),
+        QStringLiteral("\r=1+1"),
+        QStringLiteral("\n=1+1"),
         QStringLiteral("+1+1"),
         QStringLiteral("-1+1"),
         QStringLiteral("@SUM(1,1)"),
