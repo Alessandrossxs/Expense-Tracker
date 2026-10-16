@@ -11,10 +11,14 @@ qt_standard_project_setup()
 
 qt_add_executable(ExpenseTracker
     src/main.cpp
+    src/MainWindow.cpp
+    src/TransactionDialog.cpp
     src/Database.cpp
     src/ExpenseManager.cpp
     src/Transaction.cpp
     src/Statistics.cpp
+    include/MainWindow.h
+    include/TransactionDialog.h
     include/Database.h
     include/ExpenseManager.h
     include/Statistics.h

@@ -1,22 +1,16 @@
+#include "MainWindow.h"
+
 #include <QApplication>
-#include <QLabel>
-#include <QWidget>
-#include <QVBoxLayout>
+#include <QCoreApplication>
 
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+    QCoreApplication::setApplicationName(QStringLiteral("Expense Tracker"));
+    QCoreApplication::setOrganizationName(QStringLiteral("Alessandro"));
 
-    QWidget window;
-    window.setWindowTitle("Expense Tracker");
-
-    auto *layout = new QVBoxLayout(&window);
-    auto *label = new QLabel("Expense Tracker - Qt is working!");
-
-    layout->addWidget(label);
-
-    window.resize(400, 200);
+    // Preserve the backend's existing relative path for expense_tracker.db.
+    MainWindow window;
     window.show();
-
     return app.exec();
 }
