@@ -1,12 +1,14 @@
 #include "TransactionDialog.h"
 
 #include <QComboBox>
+#include <QDate>
 #include <QDateEdit>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QMessageBox>
 #include <QVBoxLayout>
+#include <QtMath>
 
 TransactionDialog::TransactionDialog(
     const QList<QVariantMap> &categories,
