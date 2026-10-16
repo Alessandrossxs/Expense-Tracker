@@ -172,6 +172,10 @@ bool Database::execute(const QString &sql)
 bool Database::open()
 {
     m_lastError.clear();
+    if (m_db.databaseName().trimmed().isEmpty()) {
+        m_lastError = QStringLiteral("Database path is empty; refusing to open a temporary database");
+        return false;
+    }
     if (m_db.isOpen()) {
         return initialize();
     }
@@ -179,7 +183,9 @@ bool Database::open()
         m_lastError = QStringLiteral("Failed to open database: ") + m_db.lastError().text();
         return false;
     }
-    if (!execute(QStringLiteral("PRAGMA foreign_keys = ON")) || !initialize()) {
+    if (!execute(QStringLiteral("PRAGMA foreign_keys = ON")) ||
+        !execute(QStringLiteral("PRAGMA secure_delete = ON")) ||
+        !initialize()) {
         m_db.close();
         return false;
     }
