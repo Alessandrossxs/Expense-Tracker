@@ -10,24 +10,31 @@ namespace
 {
 QString csvField(const QString &value)
 {
-    // CSV quoting prevents delimiter/quote breakout, but not spreadsheet formula execution.
-    // Prefix formula-like values with a tab inside the quoted cell for safer human viewing
-    // in spreadsheet applications. The tab is intentionally preserved in exported data.
+    // Quote every cell to prevent delimiter/quote breakout. Spreadsheet software may
+    // still evaluate formula-like values, so neutralize dangerous prefixes as well.
     QString safeValue = value;
-    const QString trimmed = safeValue.trimmed();
-    if (!trimmed.isEmpty()) {
-        const QChar first = trimmed.front();
-        if (first == QLatin1Char('=') || first == QLatin1Char('+') ||
+    int firstNonWhitespace = 0;
+    while (firstNonWhitespace < safeValue.size() &&
+           safeValue.at(firstNonWhitespace).isSpace()) {
+        ++firstNonWhitespace;
+    }
+
+    if (firstNonWhitespace < safeValue.size()) {
+        const QChar first = safeValue.at(firstNonWhitespace);
+        const bool formulaLike =
+            first == QLatin1Char('=') || first == QLatin1Char('+') ||
             first == QLatin1Char('-') || first == QLatin1Char('@') ||
             first == QChar(0xFF1D) || first == QChar(0xFF0B) ||
             first == QChar(0xFF0D) || first == QChar(0xFF20) ||
-            first == QLatin1Char('\t') || first == QLatin1Char('\r') ||
-            first == QLatin1Char('\n')) {
-            safeValue.prepend(QLatin1Char('\t'));
+            first == QChar(0x0000);
+        if (formulaLike) {
+            // Insert immediately before the first non-whitespace character. This
+            // also handles values with leading spaces without moving those spaces.
+            safeValue.insert(firstNonWhitespace, QLatin1Char('\\t'));
         }
     }
 
-    safeValue.replace(QLatin1Char('"'), QStringLiteral("\"\""));
+    safeValue.replace(QLatin1Char('"'), QStringLiteral("\\"\\""));
     return QLatin1Char('"') + safeValue + QLatin1Char('"');
 }
 }
