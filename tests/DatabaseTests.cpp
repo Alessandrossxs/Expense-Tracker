@@ -430,9 +430,7 @@ int main(int argc, char *argv[])
         if (!expect(formulaCsvFile.open(QIODevice::ReadOnly), formulaCsvFile.errorString()))
             return 1;
         const QByteArray formulaCsvContents = formulaCsvFile.readAll();
-        const QString neutralized = payload.startsWith(QStringLiteral("  "))
-            ? QStringLiteral("  \t=1+1")
-            : QStringLiteral("\t") + payload;
+        const QString neutralized = QStringLiteral("\t") + payload;
         if (!expect(
                 formulaCsvContents.contains(neutralized.toUtf8()),
                 QStringLiteral("CSV formula prefix was not neutralized: ") + payload)) {
