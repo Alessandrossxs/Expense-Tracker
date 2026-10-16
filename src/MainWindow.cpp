@@ -461,6 +461,15 @@ QString databasePath()
         if (canonicalLegacyPath == QFileInfo(stableDatabase).absoluteFilePath())
             return stableDatabase;
 
+        // Avoid copying a live/recoverable SQLite database without its sidecar files.
+        if (QFileInfo::exists(canonicalLegacyPath + QStringLiteral("-wal")) ||
+            QFileInfo::exists(canonicalLegacyPath + QStringLiteral("-shm")) ||
+            QFileInfo::exists(canonicalLegacyPath + QStringLiteral("-journal"))) {
+            qWarning() << "Legacy database has SQLite sidecar files; using it directly for now:"
+                       << canonicalLegacyPath;
+            return canonicalLegacyPath;
+        }
+
         if (QFile::copy(canonicalLegacyPath, stableDatabase)) {
             QFile::setPermissions(
                 stableDatabase,
