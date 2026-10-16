@@ -192,6 +192,27 @@ bool Database::open()
         m_lastError = QStringLiteral("Failed to open database: ") + m_db.lastError().text();
         return false;
     }
+
+    // Fail closed when an existing database is corrupt; do not initialize schema
+    // over a damaged file or silently replace a user's ledger with a new one.
+    QSqlQuery integrityQuery(m_db);
+    if (!integrityQuery.exec(QStringLiteral("PRAGMA quick_check"))) {
+        m_lastError = QStringLiteral("Database integrity check failed: ") +
+                      integrityQuery.lastError().text();
+        m_db.close();
+        return false;
+    }
+    if (!integrityQuery.next() ||
+        integrityQuery.value(0).toString() != QStringLiteral("ok")) {
+        m_lastError = QStringLiteral("Database integrity check failed");
+        if (integrityQuery.isValid()) {
+            m_lastError += QStringLiteral(": ") + integrityQuery.value(0).toString();
+        }
+        m_db.close();
+        return false;
+    }
+    integrityQuery.finish();
+
     if (!execute(QStringLiteral("PRAGMA foreign_keys = ON")) ||
         !execute(QStringLiteral("PRAGMA secure_delete = ON")) ||
         !initialize()) {
