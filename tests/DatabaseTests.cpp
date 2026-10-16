@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    Database emptyPathDatabase(QString());
+    Database emptyPathDatabase{QString()};
     if (!expect(!emptyPathDatabase.open(),
                 QStringLiteral("An empty database path must not open a temporary database")) ||
         !expect(!emptyPathDatabase.lastError().isEmpty(),
