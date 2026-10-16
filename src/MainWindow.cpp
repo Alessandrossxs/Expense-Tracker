@@ -11,7 +11,6 @@
 #include <QColor>
 #include <QComboBox>
 #include <QCoreApplication>
-#include <QCryptographicHash>
 #include <QDate>
 #include <QDateEdit>
 #include <QDoubleSpinBox>
@@ -1453,9 +1452,8 @@ bool MainWindow::initializeData()
         return false;
     }
     if (accounts.isEmpty()) {
-        const QString hash = QString::fromLatin1(
-            QCryptographicHash::hash(QByteArrayLiteral("expense-tracker-local-account"),
-                                     QCryptographicHash::Sha256).toHex());
+        // This field is retained for database compatibility; the app has no login system.
+        const QString hash = QStringLiteral("local-ledger-no-auth");
         int firstAccountId = 0;
         if (!m_manager.addAccount(tr("Personale"), hash,
                                   QDate::currentDate().toString(Qt::ISODate), 0,
@@ -1820,9 +1818,8 @@ void MainWindow::createAccount()
         return;
     }
 
-    const QString hash = QString::fromLatin1(
-        QCryptographicHash::hash(QByteArrayLiteral("expense-tracker-local-account"),
-                                 QCryptographicHash::Sha256).toHex());
+    // This legacy column is not used for authentication.
+    const QString hash = QStringLiteral("local-ledger-no-auth");
     int newAccountId = 0;
     if (!m_manager.addAccount(
             name->text(),
