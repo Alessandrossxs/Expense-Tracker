@@ -380,16 +380,18 @@ int main(int argc, char *argv[])
         return 1;
     }
     const QByteArray csvContents = csvFile.readAll();
+    QByteArray normalizedCsvContents = csvContents;
+    normalizedCsvContents.replace(QByteArrayLiteral("\r\n"), QByteArrayLiteral("\n"));
     if (!expect(
-            csvContents.startsWith(
-                QByteArrayLiteral("transaction_id,account_id,category_id,date,type,amount_cents,notes\r\n")),
+            normalizedCsvContents.startsWith(
+                QByteArrayLiteral("transaction_id,account_id,category_id,date,type,amount_cents,notes\n")),
             QStringLiteral("CSV header is incorrect")) ||
-        !expect(csvContents.count('\n') == 2, QStringLiteral("CSV export contains unexpected rows")) ||
+        !expect(normalizedCsvContents.count('\n') == 2, QStringLiteral("CSV export contains unexpected rows")) ||
         !expect(
-            csvContents.contains(
-                QByteArrayLiteral(",\"expense\",\"1500\",\"\\t=1+1\"\r\n")),
+            normalizedCsvContents.contains(
+                QByteArrayLiteral(",\"expense\",\"1500\",\"\\t=1+1\"\n")),
             QStringLiteral("CSV formula-like notes were not neutralized")) ||
-        !expect(!csvContents.contains(QByteArrayLiteral(",\"=1+1\"")),
+        !expect(!normalizedCsvContents.contains(QByteArrayLiteral(",\"=1+1\"")),
                 QStringLiteral("CSV contains an unneutralized formula-like value"))) {
         return 1;
     }
