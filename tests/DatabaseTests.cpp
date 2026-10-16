@@ -361,6 +361,13 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    // Regression test: notes that look like spreadsheet formulas must be neutralized.
+    Transaction csvFormulaTransaction = filteredTransactions.first();
+    csvFormulaTransaction.setNotes(QStringLiteral("=1+1"));
+    if (!expect(manager.updateTransaction(csvFormulaTransaction), manager.lastError())) {
+        return 1;
+    }
+
     const QString csvPath = temporaryDirectory.filePath(QStringLiteral("transactions.csv"));
     if (!expect(
             manager.exportTransactionsToCsv(managedAccountId, csvPath, filter),
@@ -379,10 +386,10 @@ int main(int argc, char *argv[])
         !expect(csvContents.count('\n') == 2, QStringLiteral("CSV export contains unexpected rows")) ||
         !expect(
             csvContents.contains(
-                QByteArrayLiteral(",\"expense\",\"1500\",\"Lunch with coworkers\"\r\n")),
-            QStringLiteral("CSV row is incorrect")) ||
-        !expect(csvContents.contains(QByteArrayLiteral(",\"Lunch with coworkers\"\r\n")),
-                QStringLiteral("CSV notes were not exported"))) {
+                QByteArrayLiteral(",\"expense\",\"1500\",\"\\t=1+1\"\r\n")),
+            QStringLiteral("CSV formula-like notes were not neutralized")) ||
+        !expect(!csvContents.contains(QByteArrayLiteral(",\"=1+1\"")),
+                QStringLiteral("CSV contains an unneutralized formula-like value"))) {
         return 1;
     }
 
