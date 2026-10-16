@@ -74,8 +74,12 @@ int main(int argc, char *argv[])
         0, firstAccountId, incomeCategoryId, QStringLiteral("2026-01-02"), 2000, true);
     const Transaction expense(
         0, firstAccountId, expenseCategoryId, QStringLiteral("2026-01-03"), 3000, false);
-    if (!expect(database.addTransaction(income), database.lastError()) ||
-        !expect(database.addTransaction(expense), database.lastError())) {
+    const bool incomeAdded = database.addTransaction(income);
+    if (!expect(incomeAdded, database.lastError())) {
+        return 1;
+    }
+    const bool expenseAdded = database.addTransaction(expense);
+    if (!expect(expenseAdded, database.lastError())) {
         return 1;
     }
 

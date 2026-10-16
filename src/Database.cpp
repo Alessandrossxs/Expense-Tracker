@@ -748,7 +748,9 @@ bool Database::addTransaction(const Transaction &transaction)
     query.addBindValue(type);
     query.addBindValue(transaction.getCategoryId());
     query.addBindValue(transaction.getAccountId());
-    query.addBindValue(transaction.getNotes());
+    query.addBindValue(transaction.getNotes().isNull()
+                           ? QStringLiteral("")
+                           : transaction.getNotes());
     if (!query.exec()) {
         setQueryError(m_lastError, QStringLiteral("Failed to create transaction"), query);
         return rollbackWithError(m_db, m_lastError);
@@ -833,7 +835,9 @@ bool Database::updateTransaction(const Transaction &transaction)
     updateQuery.addBindValue(newType);
     updateQuery.addBindValue(transaction.getCategoryId());
     updateQuery.addBindValue(transaction.getAccountId());
-    updateQuery.addBindValue(transaction.getNotes());
+    updateQuery.addBindValue(transaction.getNotes().isNull()
+                                 ? QStringLiteral("")
+                                 : transaction.getNotes());
     updateQuery.addBindValue(transaction.getId());
     if (!updateQuery.exec()) {
         setQueryError(m_lastError, QStringLiteral("Failed to update transaction"), updateQuery);
