@@ -13,24 +13,33 @@ QString csvField(const QString &value)
     // Quote every cell to prevent delimiter/quote breakout. Spreadsheet software may
     // still evaluate formula-like values, so neutralize dangerous prefixes as well.
     QString safeValue = value;
-    int firstNonWhitespace = 0;
-    while (firstNonWhitespace < safeValue.size() &&
-           safeValue.at(firstNonWhitespace).isSpace()) {
-        ++firstNonWhitespace;
-    }
+    if (!safeValue.isEmpty()) {
+        const QChar firstCharacter = safeValue.front();
+        if (firstCharacter == QLatin1Char('\t') ||
+            firstCharacter == QLatin1Char('\r') ||
+            firstCharacter == QLatin1Char('\n') ||
+            firstCharacter == QChar(0x0000)) {
+            safeValue.prepend(QLatin1Char('\t'));
+        } else {
+            int firstNonWhitespace = 0;
+            while (firstNonWhitespace < safeValue.size() &&
+                   safeValue.at(firstNonWhitespace).isSpace()) {
+                ++firstNonWhitespace;
+            }
 
-    if (firstNonWhitespace < safeValue.size()) {
-        const QChar first = safeValue.at(firstNonWhitespace);
-        const bool formulaLike =
-            first == QLatin1Char('=') || first == QLatin1Char('+') ||
-            first == QLatin1Char('-') || first == QLatin1Char('@') ||
-            first == QChar(0xFF1D) || first == QChar(0xFF0B) ||
-            first == QChar(0xFF0D) || first == QChar(0xFF20) ||
-            first == QChar(0x0000);
-        if (formulaLike) {
-            // Insert immediately before the first non-whitespace character. This
-            // also handles values with leading spaces without moving those spaces.
-            safeValue.insert(firstNonWhitespace, QLatin1Char('\t'));
+            if (firstNonWhitespace < safeValue.size()) {
+                const QChar first = safeValue.at(firstNonWhitespace);
+                const bool formulaLike =
+                    first == QLatin1Char('=') || first == QLatin1Char('+') ||
+                    first == QLatin1Char('-') || first == QLatin1Char('@') ||
+                    first == QChar(0xFF1D) || first == QChar(0xFF0B) ||
+                    first == QChar(0xFF0D) || first == QChar(0xFF20);
+                if (formulaLike) {
+                    // Keep leading spaces, but put the neutralizing tab directly
+                    // before the first non-whitespace character.
+                    safeValue.insert(firstNonWhitespace, QLatin1Char('\t'));
+                }
+            }
         }
     }
 
