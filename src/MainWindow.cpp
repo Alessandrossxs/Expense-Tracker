@@ -38,6 +38,7 @@
 #include <QSettings>
 #include <QSignalBlocker>
 #include <QScrollArea>
+#include <QStandardPaths>
 #include <QStyleFactory>
 #include <QStackedWidget>
 #include <QStandardItemModel>
@@ -436,7 +437,19 @@ QString databasePath()
     const QString currentDatabase = QDir::current().filePath(fileName);
     if (QFileInfo::exists(currentDatabase))
         return QFileInfo(currentDatabase).canonicalFilePath();
-    return currentDatabase;
+
+    const QString applicationDataDirectory =
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (applicationDataDirectory.isEmpty()) {
+        qWarning() << "Unable to determine the application data directory";
+        return currentDatabase;
+    }
+    if (!QDir().mkpath(applicationDataDirectory)) {
+        qWarning() << "Unable to create application data directory:"
+                   << applicationDataDirectory;
+        return currentDatabase;
+    }
+    return QDir(applicationDataDirectory).filePath(fileName);
 }
 
 QString accountTypeLabel(const QString &type)

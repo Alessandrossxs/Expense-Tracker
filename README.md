@@ -53,6 +53,29 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+### Windows installer
+
+On Windows with Qt 6, MinGW, CMake, and IExpress installed, build a self-extracting
+per-user installer from PowerShell:
+
+```powershell
+.\packaging\Build-Installer.ps1
+```
+
+The script builds a separate Release configuration with `BUILD_TESTING=OFF`,
+deploys the Qt and MinGW runtime files, and writes
+`dist\ExpenseTracker-Setup.exe`. Run the installer to choose a per-user install
+folder and optionally create a desktop shortcut. The uninstaller removes the
+installed application files and shortcuts but preserves account and transaction
+databases. The setup and uninstaller run under the current PowerShell execution
+policy; neither script overrides it.
+
+The SQLite database is stored as a normal local file and is not encrypted by
+the application. Protect it with your Windows account and device security
+(including full-disk encryption where available), and keep backups in a secure
+location. The installer is not code-signed, so obtain it only from a trusted
+release source.
+
 ## Amounts, accounts, and filters
 
 Transaction amounts and account balances are stored as integer cents to avoid

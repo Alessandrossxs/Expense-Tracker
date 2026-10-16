@@ -1,5 +1,8 @@
 data/
 build/
+build-installer/
+installer-stage/
+dist/
 
 *.o
 *.obj
