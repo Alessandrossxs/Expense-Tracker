@@ -2,6 +2,8 @@
 
 #include "TransactionDialog.h"
 
+#include <QAbstractItemView>
+#include <QColor>
 #include <QComboBox>
 #include <QCryptographicHash>
 #include <QDate>
@@ -12,6 +14,7 @@
 #include <QHeaderView>
 #include <QInputDialog>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSqlDatabase>
@@ -28,6 +31,9 @@
 #include <QDir>
 #include <QUuid>
 #include <QDateTime>
+#include <QTimer>
+
+#include <algorithm>
 
 namespace
 {
@@ -121,7 +127,7 @@ bool MainWindow::initializeData()
     }
 
     // The current backend exposes account creation but not account listing.
-    // Read only the account IDs/names through a short-lived SQLite connection.
+    // Read only the account IDs through a short-lived SQLite connection.
     const QString connectionName = QStringLiteral("ui_accounts_%1")
         .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     int firstAccountId = 0;
@@ -129,16 +135,20 @@ bool MainWindow::initializeData()
         QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
         db.setDatabaseName(QDir::current().filePath(QStringLiteral("expense_tracker.db")));
         if (!db.open()) {
-            showError(tr("Impossibile leggere gli account: %1").arg(db.lastError().text()));
+            const QString error = db.lastError().text();
+            db = QSqlDatabase();
             QSqlDatabase::removeDatabase(connectionName);
+            showError(tr("Impossibile leggere gli account: %1").arg(error));
             return false;
         }
         QSqlQuery query(db);
         if (!query.exec(QStringLiteral("SELECT ID_Account FROM Bank_Account ORDER BY ID_Account LIMIT 1"))) {
-            showError(tr("Impossibile leggere gli account: %1").arg(query.lastError().text()));
+            const QString error = query.lastError().text();
+            query.finish();
             db.close();
             db = QSqlDatabase();
             QSqlDatabase::removeDatabase(connectionName);
+            showError(tr("Impossibile leggere gli account: %1").arg(error));
             return false;
         }
         if (query.next())
