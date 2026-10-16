@@ -607,7 +607,8 @@ bool Database::deleteTransaction(int transactionId)
 
 bool Database::getTransactions(
     int accountId,
-    QList<Transaction> &transactions)
+    QList<Transaction> &transactions,
+    const TransactionFilter &filter)
 {
     m_lastError.clear();
     if (!isOpen()) {
@@ -618,14 +619,64 @@ bool Database::getTransactions(
         m_lastError = QStringLiteral("Account ID must be positive");
         return false;
     }
+    if ((!filter.dateFrom.isEmpty() && !isValidIsoDate(filter.dateFrom)) ||
+        (!filter.dateTo.isEmpty() && !isValidIsoDate(filter.dateTo))) {
+        m_lastError = QStringLiteral("Transaction filter dates must be valid ISO dates (YYYY-MM-DD)");
+        return false;
+    }
+    if (!filter.dateFrom.isEmpty() && !filter.dateTo.isEmpty() &&
+        filter.dateFrom > filter.dateTo) {
+        m_lastError = QStringLiteral("Transaction filter start date must not be after end date");
+        return false;
+    }
+    if (filter.categoryId < 0) {
+        m_lastError = QStringLiteral("Category filter ID cannot be negative");
+        return false;
+    }
+    if (filter.minimumAmount < 0 || filter.maximumAmount < 0 ||
+        (filter.maximumAmount != 0 && filter.minimumAmount > filter.maximumAmount)) {
+        m_lastError = QStringLiteral("Transaction amount filter range is invalid");
+        return false;
+    }
 
-    QSqlQuery query(m_db);
-    query.prepare(
+    QString sql =
         QStringLiteral(
             "SELECT ID_Transaction, ID_Account, ID_Category, Date, Amount, Type "
-            "FROM Transactions WHERE ID_Account = ? "
-            "ORDER BY Date, ID_Transaction"));
+            "FROM Transactions WHERE ID_Account = ?");
+    if (!filter.dateFrom.isEmpty()) {
+        sql += QStringLiteral(" AND Date >= ?");
+    }
+    if (!filter.dateTo.isEmpty()) {
+        sql += QStringLiteral(" AND Date <= ?");
+    }
+    if (filter.categoryId > 0) {
+        sql += QStringLiteral(" AND ID_Category = ?");
+    }
+    if (filter.minimumAmount > 0) {
+        sql += QStringLiteral(" AND Amount >= ?");
+    }
+    if (filter.maximumAmount > 0) {
+        sql += QStringLiteral(" AND Amount <= ?");
+    }
+    sql += QStringLiteral(" ORDER BY Date, ID_Transaction");
+    QSqlQuery query(m_db);
+    query.prepare(sql);
     query.addBindValue(accountId);
+    if (!filter.dateFrom.isEmpty()) {
+        query.addBindValue(filter.dateFrom);
+    }
+    if (!filter.dateTo.isEmpty()) {
+        query.addBindValue(filter.dateTo);
+    }
+    if (filter.categoryId > 0) {
+        query.addBindValue(filter.categoryId);
+    }
+    if (filter.minimumAmount > 0) {
+        query.addBindValue(filter.minimumAmount);
+    }
+    if (filter.maximumAmount > 0) {
+        query.addBindValue(filter.maximumAmount);
+    }
     if (!query.exec()) {
         setQueryError(m_lastError, QStringLiteral("Failed to retrieve transactions"), query);
         return false;

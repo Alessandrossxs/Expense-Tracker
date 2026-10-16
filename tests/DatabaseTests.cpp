@@ -1,9 +1,14 @@
 #include "Database.h"
+#include "ExpenseManager.h"
+#include "Statistics.h"
 #include "Transaction.h"
 
 #include <QCoreApplication>
+#include <QFile>
 #include <QTemporaryDir>
 #include <iostream>
+#include <limits>
+#include <stdexcept>
 
 namespace
 {
@@ -112,6 +117,168 @@ int main(int argc, char *argv[])
             database.lastError()) ||
         !expect(database.getAccountBalance(secondAccountId, secondBalance), database.lastError()) ||
         !expect(secondBalance == 500, QStringLiteral("Deleted transaction did not restore balance"))) {
+        return 1;
+    }
+
+    const Statistics statistics({income, expense});
+    if (!expect(statistics.getTotalIncome() == 2000, QStringLiteral("Income total is incorrect")) ||
+        !expect(statistics.getTotalExpenses() == 3000, QStringLiteral("Expense total is incorrect")) ||
+        !expect(statistics.getBalance() == -1000, QStringLiteral("Transaction balance is incorrect"))) {
+        return 1;
+    }
+
+    const Statistics emptyStatistics({});
+    if (!expect(emptyStatistics.getTotalIncome() == 0, QStringLiteral("Empty income total is not zero")) ||
+        !expect(emptyStatistics.getTotalExpenses() == 0, QStringLiteral("Empty expense total is not zero")) ||
+        !expect(emptyStatistics.getBalance() == 0, QStringLiteral("Empty balance is not zero"))) {
+        return 1;
+    }
+
+    const QList<Transaction> overflowingTransactions = {
+        Transaction(0, firstAccountId, incomeCategoryId, QStringLiteral("2026-01-04"),
+                    std::numeric_limits<qint64>::max(), true),
+        Transaction(0, firstAccountId, incomeCategoryId, QStringLiteral("2026-01-05"), 1, true)};
+    bool overflowDetected = false;
+    try {
+        const Statistics overflowingStatistics(overflowingTransactions);
+        Q_UNUSED(overflowingStatistics);
+    } catch (const std::overflow_error &) {
+        overflowDetected = true;
+    }
+    if (!expect(overflowDetected, QStringLiteral("Income total overflow was not reported"))) {
+        return 1;
+    }
+
+    ExpenseManager manager(temporaryDirectory.filePath(QStringLiteral("manager-test.sqlite")));
+    if (!expect(manager.open(), manager.lastError())) {
+        return 1;
+    }
+
+    int managedAccountId = 0;
+    int managedIncomeCategoryId = 0;
+    int managedExpenseCategoryId = 0;
+    if (!expect(
+            manager.addAccount(
+                QStringLiteral("Managed account"),
+                QStringLiteral("test-hash"),
+                QStringLiteral("2026-02-01"),
+                10000,
+                &managedAccountId),
+            manager.lastError()) ||
+        !expect(
+            manager.addCategory(
+                QStringLiteral("Managed salary"),
+                QStringLiteral("in"),
+                &managedIncomeCategoryId),
+            manager.lastError()) ||
+        !expect(
+            manager.addCategory(
+                QStringLiteral("Managed food"),
+                QStringLiteral("out"),
+                &managedExpenseCategoryId),
+            manager.lastError())) {
+        return 1;
+    }
+
+    if (!expect(
+            manager.addTransaction(Transaction(
+                0,
+                managedAccountId,
+                managedIncomeCategoryId,
+                QStringLiteral("2026-02-02"),
+                3000,
+                true)),
+            manager.lastError()) ||
+        !expect(
+            manager.addTransaction(Transaction(
+                0,
+                managedAccountId,
+                managedExpenseCategoryId,
+                QStringLiteral("2026-02-03"),
+                1500,
+                false)),
+            manager.lastError())) {
+        return 1;
+    }
+
+    qint64 managedBalance = 0;
+    QList<QVariantMap> managedCategories;
+    QList<Transaction> managedTransactions;
+    if (!expect(manager.getCategories(managedCategories), manager.lastError()) ||
+        !expect(managedCategories.size() == 2, QStringLiteral("Managed categories were not retrieved")) ||
+        !expect(
+            manager.getTransactions(managedAccountId, managedTransactions),
+            manager.lastError()) ||
+        !expect(managedTransactions.size() == 2, QStringLiteral("Managed transactions were not retrieved"))) {
+        return 1;
+    }
+    Transaction updatedIncome = managedTransactions.first();
+    updatedIncome.setAmount(3500);
+    if (!expect(manager.updateTransaction(updatedIncome), manager.lastError()) ||
+        !expect(manager.getAccountBalance(managedAccountId, managedBalance), manager.lastError()) ||
+        !expect(managedBalance == 12000, QStringLiteral("Managed transaction update did not adjust balance")) ||
+        !expect(manager.deleteTransaction(updatedIncome.getId()), manager.lastError()) ||
+        !expect(manager.getAccountBalance(managedAccountId, managedBalance), manager.lastError()) ||
+        !expect(managedBalance == 8500, QStringLiteral("Managed transaction deletion did not adjust balance"))) {
+        return 1;
+    }
+
+    TransactionFilter filter;
+    filter.dateFrom = QStringLiteral("2026-02-03");
+    filter.dateTo = QStringLiteral("2026-02-03");
+    filter.categoryId = managedExpenseCategoryId;
+    filter.minimumAmount = 1000;
+    filter.maximumAmount = 2000;
+    QList<Transaction> filteredTransactions;
+    if (!expect(
+            manager.getTransactions(managedAccountId, filteredTransactions, filter),
+            manager.lastError()) ||
+        !expect(filteredTransactions.size() == 1, QStringLiteral("Transaction filters returned the wrong count")) ||
+        !expect(filteredTransactions.first().getAmount() == 1500, QStringLiteral("Transaction filters returned the wrong amount"))) {
+        return 1;
+    }
+
+    Statistics filteredStatistics;
+    if (!expect(
+            manager.getStatistics(managedAccountId, filteredStatistics, filter),
+            manager.lastError()) ||
+        !expect(filteredStatistics.getTotalIncome() == 0, QStringLiteral("Filtered income total is incorrect")) ||
+        !expect(filteredStatistics.getTotalExpenses() == 1500, QStringLiteral("Filtered expense total is incorrect")) ||
+        !expect(filteredStatistics.getBalance() == -1500, QStringLiteral("Filtered balance is incorrect")) ||
+        !expect(manager.getAccountBalance(managedAccountId, managedBalance), manager.lastError()) ||
+        !expect(managedBalance == 8500, QStringLiteral("Managed account balance is incorrect"))) {
+        return 1;
+    }
+
+    const QString csvPath = temporaryDirectory.filePath(QStringLiteral("transactions.csv"));
+    if (!expect(
+            manager.exportTransactionsToCsv(managedAccountId, csvPath, filter),
+            manager.lastError())) {
+        return 1;
+    }
+    QFile csvFile(csvPath);
+    if (!expect(csvFile.open(QIODevice::ReadOnly), csvFile.errorString())) {
+        return 1;
+    }
+    const QByteArray csvContents = csvFile.readAll();
+    if (!expect(
+            csvContents.startsWith(
+                QByteArrayLiteral("transaction_id,account_id,category_id,date,type,amount_cents\r\n")),
+            QStringLiteral("CSV header is incorrect")) ||
+        !expect(csvContents.count('\n') == 2, QStringLiteral("CSV export contains unexpected rows")) ||
+        !expect(
+            csvContents.contains(QByteArrayLiteral(",expense,\"1500\"\r\n")),
+            QStringLiteral("CSV row is incorrect"))) {
+        return 1;
+    }
+
+    TransactionFilter invalidFilter;
+    invalidFilter.dateFrom = QStringLiteral("2026-02-04");
+    invalidFilter.dateTo = QStringLiteral("2026-02-03");
+    if (!expect(
+            !manager.getTransactions(managedAccountId, filteredTransactions, invalidFilter),
+            QStringLiteral("Invalid transaction filter was accepted")) ||
+        !expect(!manager.lastError().isEmpty(), QStringLiteral("Invalid filter did not report an error"))) {
         return 1;
     }
 

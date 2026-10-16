@@ -7,6 +7,15 @@
 
 class Transaction;
 
+struct TransactionFilter
+{
+    QString dateFrom;
+    QString dateTo;
+    int categoryId = 0;
+    qint64 minimumAmount = 0;
+    qint64 maximumAmount = 0;
+};
+
 class Database
 {
 private:
@@ -55,5 +64,6 @@ public:
 
     bool getTransactions(
         int accountId,
-        QList<Transaction> &transactions);
+        QList<Transaction> &transactions,
+        const TransactionFilter &filter = TransactionFilter{});
 };

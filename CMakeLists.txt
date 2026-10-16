@@ -12,8 +12,12 @@ qt_standard_project_setup()
 qt_add_executable(ExpenseTracker
     src/main.cpp
     src/Database.cpp
+    src/ExpenseManager.cpp
     src/Transaction.cpp
+    src/Statistics.cpp
     include/Database.h
+    include/ExpenseManager.h
+    include/Statistics.h
     include/Transaction.h
 )
 
@@ -32,8 +36,12 @@ if(BUILD_TESTING)
     add_executable(DatabaseTests
         tests/DatabaseTests.cpp
         src/Database.cpp
+        src/ExpenseManager.cpp
         src/Transaction.cpp
+        src/Statistics.cpp
         include/Database.h
+        include/ExpenseManager.h
+        include/Statistics.h
         include/Transaction.h
     )
 
