@@ -1,0 +1,193 @@
+diff --git a/.gitignore b/.gitignore
+index 16f0e51..ec26a64 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,6 +1,10 @@
+-data/
+ build/
+ 
++# Local SQLite databases
++*.db
++*.sqlite
++*.sqlite3
++
+ *.o
+ *.obj
+ *.exe
+diff --git a/LICENSE b/LICENSE
+new file mode 100644
+index 0000000..4e30326
+--- /dev/null
++++ b/LICENSE
+@@ -0,0 +1,21 @@
++MIT License
++
++Copyright (c) 2026 Alessandro
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in all
++copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++SOFTWARE.
+diff --git a/README.md b/README.md
+index fc72b9e..758dcd8 100644
+--- a/README.md
++++ b/README.md
+@@ -4,11 +4,11 @@ A C++ application for managing personal income and expenses, tracking financial
+ 
+ ## Features
+ 
++- Qt desktop interface with three pages: **Panoramica** (dashboard), **Transazioni**, and **Categorie**
++- Dashboard with current balance, total income, total expenses, this month's expenses, and recent transactions
+ - Add, edit, and delete transactions
+-- Track income and expenses
+-- Organize transactions by category
++- Organize transactions by category (default categories are created on first launch; new ones can be added from the UI)
+ - Filter transactions by date range, category, and amount range
+-- Calculate total income, expenses, and current balance
+ - Store accounts, categories, transactions, and balances in SQLite
+ - Export filtered transaction data to CSV
+ 
+@@ -21,12 +21,13 @@ A C++ application for managing personal income and expenses, tracking financial
+ ## Project Structure
+ 
+ ```text
+-ExpenseTracker/
+-├── src/
+-├── include/
+-├── tests/
+-├── data/
++Expense-Tracker/
++├── .github/workflows/   # CI: build and run tests
++├── src/                 # Implementation (UI, database, business logic)
++├── include/             # Headers
++├── tests/               # Database and statistics tests
+ ├── CMakeLists.txt
++├── LICENSE
+ ├── README.md
+ └── .gitignore
+ ```
+@@ -41,13 +42,26 @@ ExpenseTracker/
+ ## Installation
+ 
+ ```bash
+-git clone https://github.com/Alessandrossxs/ExpenseTracker.git
+-cd ExpenseTracker
++git clone https://github.com/Alessandrossxs/Expense-Tracker.git
++cd Expense-Tracker
+ cmake -S . -B build
+ cmake --build build
+ ctest --test-dir build --output-on-failure
+ ```
+ 
++## Usage
++
++Run the application from the directory where you want the data to live:
++
++```bash
++./build/ExpenseTracker
++```
++
++On first launch the app creates a SQLite database named `expense_tracker.db`
++in the **current working directory**, together with a default account and a set
++of default categories. Launching it from a different directory creates or opens
++a different database. The `.db` file is ignored by Git.
++
+ ## Amounts, accounts, and filters
+ 
+ Transaction amounts and account balances are stored as integer cents to avoid
+@@ -64,31 +78,6 @@ CSV exports use UTF-8 and contain the columns
+ `transaction_id,account_id,category_id,date,type,amount_cents`. Values are
+ written in cents, not formatted currency units.
+ 
+-## Application entry point
+-
+-The current entry point is intentionally a minimal Qt window. Database access,
+-transaction management, statistics, filtering, and CSV export are available
+-through the C++ classes and can be connected to a UI in `src/main.cpp`.
+-
+-## Example menu design
+-
+-```text
+-================================
+-       EXPENSE TRACKER
+-================================
+-
+-1. Add transaction
+-2. View transactions
+-3. Edit transaction
+-4. Delete transaction
+-5. View financial summary
+-6. Filter transactions
+-7. Export to CSV
+-0. Exit
+-
+-Select an option:
+-```
+-
+ ## License
+ 
+ This project is licensed under the MIT License. See the `LICENSE` file for details.
+diff --git a/src/ExpenseManager.cpp b/src/ExpenseManager.cpp
+index 4650790..3012570 100644
+--- a/src/ExpenseManager.cpp
++++ b/src/ExpenseManager.cpp
+@@ -10,6 +10,11 @@ namespace
+ {
+ QString csvField(const QString &value)
+ {
++    // RFC 4180: quote only fields that contain a separator, quote or line break.
++    if (!value.contains(QLatin1Char(',')) && !value.contains(QLatin1Char('"'))
++        && !value.contains(QLatin1Char('\n')) && !value.contains(QLatin1Char('\r'))) {
++        return value;
++    }
+     QString escaped = value;
+     escaped.replace(QLatin1Char('"'), QStringLiteral("\"\""));
+     return QLatin1Char('"') + escaped + QLatin1Char('"');
+diff --git a/src/MainWindow.cpp b/src/MainWindow.cpp
+index bb03e64..a7d445f 100644
+--- a/src/MainWindow.cpp
++++ b/src/MainWindow.cpp
+@@ -76,7 +76,7 @@ QTableWidget *makeTable(const QStringList &headers, QWidget *parent)
+     return table;
+ }
+ 
+-QTableWidgetItem *cell(const QString &text, int alignment = Qt::AlignVCenter | Qt::AlignLeft)
++QTableWidgetItem *cell(const QString &text, Qt::Alignment alignment = Qt::AlignVCenter | Qt::AlignLeft)
+ {
+     auto *item = new QTableWidgetItem(text);
+     item->setTextAlignment(alignment);
+diff --git a/tests/DatabaseTests.cpp b/tests/DatabaseTests.cpp
+index c2e81fb..20d352a 100644
+--- a/tests/DatabaseTests.cpp
++++ b/tests/DatabaseTests.cpp
+@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
+         return 1;
+     }
+ 
+-    const Statistics emptyStatistics({});
++    const Statistics emptyStatistics{QList<Transaction>{}};
+     if (!expect(emptyStatistics.getTotalIncome() == 0, QStringLiteral("Empty income total is not zero")) ||
+         !expect(emptyStatistics.getTotalExpenses() == 0, QStringLiteral("Empty expense total is not zero")) ||
+         !expect(emptyStatistics.getBalance() == 0, QStringLiteral("Empty balance is not zero"))) {
+@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
+             QStringLiteral("CSV header is incorrect")) ||
+         !expect(csvContents.count('\n') == 2, QStringLiteral("CSV export contains unexpected rows")) ||
+         !expect(
+-            csvContents.contains(QByteArrayLiteral(",expense,\"1500\"\r\n")),
++            csvContents.contains(QByteArrayLiteral(",expense,1500\r\n")),
+             QStringLiteral("CSV row is incorrect"))) {
+         return 1;
+     }

@@ -76,7 +76,7 @@ QTableWidget *makeTable(const QStringList &headers, QWidget *parent)
     return table;
 }
 
-QTableWidgetItem *cell(const QString &text, int alignment = Qt::AlignVCenter | Qt::AlignLeft)
+QTableWidgetItem *cell(const QString &text, Qt::Alignment alignment = Qt::AlignVCenter | Qt::AlignLeft)
 {
     auto *item = new QTableWidgetItem(text);
     item->setTextAlignment(alignment);

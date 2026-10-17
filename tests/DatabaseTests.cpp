@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    const Statistics emptyStatistics({});
+    const Statistics emptyStatistics{QList<Transaction>{}};
     if (!expect(emptyStatistics.getTotalIncome() == 0, QStringLiteral("Empty income total is not zero")) ||
         !expect(emptyStatistics.getTotalExpenses() == 0, QStringLiteral("Empty expense total is not zero")) ||
         !expect(emptyStatistics.getBalance() == 0, QStringLiteral("Empty balance is not zero"))) {
@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
             QStringLiteral("CSV header is incorrect")) ||
         !expect(csvContents.count('\n') == 2, QStringLiteral("CSV export contains unexpected rows")) ||
         !expect(
-            csvContents.contains(QByteArrayLiteral(",expense,\"1500\"\r\n")),
+            csvContents.contains(QByteArrayLiteral(",expense,1500\r\n")),
             QStringLiteral("CSV row is incorrect"))) {
         return 1;
     }

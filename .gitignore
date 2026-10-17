@@ -1,5 +1,9 @@
-data/
 build/
+
+# Local SQLite databases
+*.db
+*.sqlite
+*.sqlite3
 
 *.o
 *.obj

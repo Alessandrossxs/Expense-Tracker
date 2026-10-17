@@ -4,11 +4,11 @@ A C++ application for managing personal income and expenses, tracking financial 
 
 ## Features
 
+- Qt desktop interface with three pages: **Panoramica** (dashboard), **Transazioni**, and **Categorie**
+- Dashboard with current balance, total income, total expenses, this month's expenses, and recent transactions
 - Add, edit, and delete transactions
-- Track income and expenses
-- Organize transactions by category
+- Organize transactions by category (default categories are created on first launch; new ones can be added from the UI)
 - Filter transactions by date range, category, and amount range
-- Calculate total income, expenses, and current balance
 - Store accounts, categories, transactions, and balances in SQLite
 - Export filtered transaction data to CSV
 
@@ -21,12 +21,13 @@ A C++ application for managing personal income and expenses, tracking financial 
 ## Project Structure
 
 ```text
-ExpenseTracker/
-├── src/
-├── include/
-├── tests/
-├── data/
+Expense-Tracker/
+├── .github/workflows/   # CI: build and run tests
+├── src/                 # Implementation (UI, database, business logic)
+├── include/             # Headers
+├── tests/               # Database and statistics tests
 ├── CMakeLists.txt
+├── LICENSE
 ├── README.md
 └── .gitignore
 ```
@@ -41,12 +42,25 @@ ExpenseTracker/
 ## Installation
 
 ```bash
-git clone https://github.com/Alessandrossxs/ExpenseTracker.git
-cd ExpenseTracker
+git clone https://github.com/Alessandrossxs/Expense-Tracker.git
+cd Expense-Tracker
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+## Usage
+
+Run the application from the directory where you want the data to live:
+
+```bash
+./build/ExpenseTracker
+```
+
+On first launch the app creates a SQLite database named `expense_tracker.db`
+in the **current working directory**, together with a default account and a set
+of default categories. Launching it from a different directory creates or opens
+a different database. The `.db` file is ignored by Git.
 
 ## Amounts, accounts, and filters
 
@@ -63,31 +77,6 @@ Dates use the ISO format `YYYY-MM-DD`; amount bounds are inclusive.
 CSV exports use UTF-8 and contain the columns
 `transaction_id,account_id,category_id,date,type,amount_cents`. Values are
 written in cents, not formatted currency units.
-
-## Application entry point
-
-The current entry point is intentionally a minimal Qt window. Database access,
-transaction management, statistics, filtering, and CSV export are available
-through the C++ classes and can be connected to a UI in `src/main.cpp`.
-
-## Example menu design
-
-```text
-================================
-       EXPENSE TRACKER
-================================
-
-1. Add transaction
-2. View transactions
-3. Edit transaction
-4. Delete transaction
-5. View financial summary
-6. Filter transactions
-7. Export to CSV
-0. Exit
-
-Select an option:
-```
 
 ## License
 

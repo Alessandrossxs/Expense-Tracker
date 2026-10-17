@@ -10,6 +10,11 @@ namespace
 {
 QString csvField(const QString &value)
 {
+    // RFC 4180: quote only fields that contain a separator, quote or line break.
+    if (!value.contains(QLatin1Char(',')) && !value.contains(QLatin1Char('"'))
+        && !value.contains(QLatin1Char('\n')) && !value.contains(QLatin1Char('\r'))) {
+        return value;
+    }
     QString escaped = value;
     escaped.replace(QLatin1Char('"'), QStringLiteral("\"\""));
     return QLatin1Char('"') + escaped + QLatin1Char('"');
