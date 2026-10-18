@@ -29,6 +29,7 @@
 #include <QShortcut>
 #include <QSignalBlocker>
 #include <QStackedWidget>
+#include <QStyledItemDelegate>
 #include <QStandardPaths>
 #include <QTableWidget>
 #include <QTableWidgetItem>
@@ -59,6 +60,26 @@ public:
             return QString::compare(a.toString(), b.toString(), Qt::CaseInsensitive) < 0;
         }
         return QTableWidgetItem::operator<(other);
+    }
+};
+
+// Selected rows use the highlight text color, even for cells that set their own
+// foreground (green/red/blue amounts), so the selection always has full contrast.
+class SelectionDelegate : public QStyledItemDelegate
+{
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+protected:
+    void initStyleOption(QStyleOptionViewItem *option, const QModelIndex &index) const override
+    {
+        QStyledItemDelegate::initStyleOption(option, index);
+        if (option->state & QStyle::State_Selected) {
+            const QBrush highlighted = option->palette.brush(QPalette::HighlightedText);
+            option->palette.setBrush(QPalette::Text, highlighted);
+            option->palette.setBrush(QPalette::WindowText, highlighted);
+            option->palette.setBrush(QPalette::HighlightedText, highlighted);
+        }
     }
 };
 
@@ -131,6 +152,7 @@ QTableWidget *makeTable(const QStringList &headers, QWidget *parent)
     table->verticalHeader()->setVisible(false);
     table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     table->setShowGrid(false);
+    table->setItemDelegate(new SelectionDelegate(table));
     table->setMinimumHeight(200);
     return table;
 }

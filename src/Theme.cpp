@@ -140,7 +140,9 @@ QString buildStyleSheet(const QColor &chosen, bool dark)
         QLabel#metricCaption { color: {{muted}}; }
         QLabel#metricValue { color: {{text}}; font-size: 19pt; font-weight: 700; }
 
-        QTableWidget { background: {{card}}; alternate-background-color: {{alt}}; border: 1px solid {{border}}; border-radius: 10px; padding: 5px; selection-background-color: {{selection}}; selection-color: {{selectionText}}; outline: 0; }
+        QTableWidget { background: {{card}}; alternate-background-color: {{alt}}; border: 1px solid {{border}}; border-radius: 10px; padding: 5px; selection-background-color: {{accent}}; selection-color: {{accentText}}; outline: 0; }
+        QTableWidget::item:selected, QTableWidget::item:selected:!active { background: {{accent}}; color: {{accentText}}; }
+        QTableWidget::item:focus { outline: none; border: none; }
         QHeaderView::section { background: {{header}}; color: {{muted}}; border: none; border-bottom: 1px solid {{border}}; padding: 11px 8px; font-weight: 600; }
 
         QLineEdit, QComboBox, QDateEdit, QDoubleSpinBox { background: {{input}}; color: {{text}}; border: 1px solid {{inputBorder}}; border-radius: 9px; padding: 0 12px; min-height: 38px; selection-background-color: {{accent}}; selection-color: {{accentText}}; placeholder-text-color: {{muted}}; }
