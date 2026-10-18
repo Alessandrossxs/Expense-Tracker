@@ -2,7 +2,9 @@
 
 #include "ChartWidgets.h"
 #include "Format.h"
-#include "TransactionDialog.h"
+#include "Popup.h"
+#include "Theme.h"
+#include "TransactionForm.h"
 
 #include <QAbstractItemView>
 #include <QButtonGroup>
@@ -13,11 +15,9 @@
 #include <QDateEdit>
 #include <QDir>
 #include <QDoubleSpinBox>
-#include <QFileDialog>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QHeaderView>
-#include <QInputDialog>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
@@ -29,7 +29,7 @@
 #include <QShortcut>
 #include <QSignalBlocker>
 #include <QStackedWidget>
-#include <QStatusBar>
+#include <QStandardPaths>
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTimer>
@@ -160,76 +160,61 @@ QPushButton *button(const QString &text, const char *objectName, QWidget *parent
     return b;
 }
 
-struct Theme
-{
-    QString bg, text, sidebar, navText, navHover, accent, accentHover, card, border, muted, alt,
-        selection, selectionText, input, inputBorder, header, secondaryText, secondaryHover;
-};
-
-Theme lightTheme()
-{
-    return {"#f5f7fb", "#172033", "#171a2b", "#c6c9d7", "#292d45", "#6658d3", "#5648c0", "#ffffff",
-            "#e7eaf1", "#778097", "#fafbfe", "#ebe9ff", "#242044", "#ffffff", "#dfe3ed", "#f8f9fc",
-            "#30384c", "#f0efff"};
-}
-
-Theme darkTheme()
-{
-    return {"#12141f", "#e6e8f2", "#0c0e18", "#aeb3c7", "#1d2036", "#7a6cf0", "#8b7df5", "#1b1e2e",
-            "#2a2e45", "#8b92ab", "#1f2335", "#38336b", "#ffffff", "#1b1e2e", "#343954", "#171a28",
-            "#dfe2f0", "#26293f"};
-}
-
-QString buildStyleSheet(const Theme &t)
-{
-    QString css = QStringLiteral(R"(
-        QMainWindow, QWidget { background: {{bg}}; color: {{text}}; font-size: 10pt; }
-        QLabel { background: transparent; }
-        QScrollArea { border: none; }
-        QWidget#transparentBox { background: transparent; }
-        QFrame#sidebar { background: {{sidebar}}; border: none; }
-        QLabel#brand { color: #ffffff; font-size: 12pt; font-weight: 700; padding: 12px 4px 20px 4px; }
-        QLabel#sidebarFooter { color: #858aa2; padding: 8px; }
-        QPushButton#navButton { color: {{navText}}; background: transparent; text-align: left; border: 0; border-radius: 9px; padding: 12px 14px; font-weight: 600; }
-        QPushButton#navButton:hover { background: {{navHover}}; color: #ffffff; }
-        QPushButton#navButton:checked { background: {{accent}}; color: #ffffff; }
-        QPushButton#themeButton { color: {{navText}}; background: transparent; text-align: left; border: 1px solid {{navHover}}; border-radius: 9px; padding: 10px 14px; font-weight: 600; }
-        QPushButton#themeButton:hover { background: {{navHover}}; color: #ffffff; }
-        QPushButton#primaryButton { background: {{accent}}; color: white; border: none; border-radius: 8px; padding: 10px 16px; font-weight: 600; }
-        QPushButton#primaryButton:hover { background: {{accentHover}}; }
-        QPushButton#secondaryButton { background: {{card}}; color: {{secondaryText}}; border: 1px solid {{inputBorder}}; border-radius: 8px; padding: 9px 14px; font-weight: 600; }
-        QPushButton#secondaryButton:hover { background: {{secondaryHover}}; }
-        QLabel#pageTitle { font-size: 23pt; font-weight: 700; color: {{text}}; }
-        QLabel#subTitle, QLabel#summaryLine { color: {{muted}}; }
-        QLabel#panelHeading { font-size: 13pt; font-weight: 700; }
-        QLabel#emptyState { color: {{muted}}; font-size: 11pt; padding: 30px; }
-        QLabel#warning { color: #d94d64; font-weight: 600; }
-        QFrame#metricCard, QFrame#panel { background: {{card}}; border: 1px solid {{border}}; border-radius: 13px; }
-        QLabel#metricCaption { color: {{muted}}; }
-        QLabel#metricValue { color: {{text}}; font-size: 19pt; font-weight: 700; }
-        QTableWidget { background: {{card}}; alternate-background-color: {{alt}}; border: 1px solid {{border}}; border-radius: 10px; padding: 5px; selection-background-color: {{selection}}; selection-color: {{selectionText}}; }
-        QHeaderView::section { background: {{header}}; color: {{muted}}; border: none; border-bottom: 1px solid {{border}}; padding: 11px 8px; font-weight: 600; }
-        QLineEdit, QComboBox, QDateEdit, QDoubleSpinBox { background: {{input}}; border: 1px solid {{inputBorder}}; border-radius: 7px; padding: 7px; }
-        QComboBox QAbstractItemView { background: {{input}}; color: {{text}}; selection-background-color: {{selection}}; selection-color: {{selectionText}}; border: 1px solid {{inputBorder}}; }
-        QStatusBar { background: {{card}}; color: {{muted}}; }
-    )");
-    const QList<QPair<QString, QString>> tokens = {
-        {"bg", t.bg}, {"text", t.text}, {"sidebar", t.sidebar}, {"navText", t.navText},
-        {"navHover", t.navHover}, {"accentHover", t.accentHover}, {"accent", t.accent},
-        {"card", t.card}, {"border", t.border}, {"muted", t.muted}, {"alt", t.alt},
-        {"selectionText", t.selectionText}, {"selection", t.selection}, {"inputBorder", t.inputBorder},
-        {"input", t.input}, {"header", t.header}, {"secondaryText", t.secondaryText},
-        {"secondaryHover", t.secondaryHover}};
-    for (const auto &token : tokens)
-        css.replace(QStringLiteral("{{%1}}").arg(token.first), token.second);
-    return css;
-}
-
 QString italianMonth(const QDate &date)
 {
     QString name = QLocale(QLocale::Italian).monthName(date.month(), QLocale::ShortFormat);
     name.remove(QLatin1Char('.'));
     return name.left(1).toUpper() + name.mid(1);
+}
+
+QString placeholderHash()
+{
+    return QString::fromLatin1(QCryptographicHash::hash(QByteArrayLiteral("expense-tracker-local-account"),
+                                                       QCryptographicHash::Sha256).toHex());
+}
+
+// A vertical group of widgets used as popup content.
+QWidget *column(const QList<QWidget *> &widgets)
+{
+    auto *box = new QWidget;
+    auto *layout = new QVBoxLayout(box);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(14);
+    for (QWidget *w : widgets)
+        layout->addWidget(w);
+    return box;
+}
+
+QLabel *hint(const QString &text)
+{
+    auto *label = new QLabel(text);
+    label->setObjectName(QStringLiteral("subTitle"));
+    label->setWordWrap(true);
+    return label;
+}
+
+QDoubleSpinBox *moneySpin(double minimum, double value = 0.0)
+{
+    auto *spin = new QDoubleSpinBox;
+    spin->setRange(minimum, 999999999.99);
+    spin->setDecimals(2);
+    spin->setSingleStep(1.0);
+    spin->setSuffix(QStringLiteral(" €"));
+    spin->setValue(value);
+    return spin;
+}
+
+QString nameEditError(const QLineEdit *edit)
+{
+    return edit->text().trimmed().isEmpty() ? QObject::tr("Inserisci un nome.") : QString();
+}
+
+const QList<QColor> &presetColors()
+{
+    static const QList<QColor> colors = {
+        QColor("#6658d3"), QColor("#3b82f6"), QColor("#0ea5e9"), QColor("#14b8a6"), QColor("#22c55e"),
+        QColor("#eab308"), QColor("#f97316"), QColor("#ef4444"), QColor("#ec4899"), QColor("#64748b")};
+    return colors;
 }
 }
 
@@ -238,22 +223,28 @@ MainWindow::MainWindow(const QString &databasePath, QWidget *parent)
 {
     setWindowTitle(tr("Expense Tracker"));
     resize(1180, 780);
-    setMinimumSize(940, 640);
+    setMinimumSize(980, 660);
+
+    QSettings settings;
+    m_darkTheme = settings.value(QStringLiteral("theme/dark"), false).toBool();
+    m_accent = QColor(settings.value(QStringLiteral("theme/accent"), QStringLiteral("#6658d3")).toString());
+    if (!m_accent.isValid())
+        m_accent = QColor(QStringLiteral("#6658d3"));
 
     if (!initializeData()) {
         QTimer::singleShot(0, this, [this] { close(); });
         return;
     }
     buildUi();
-    applyTheme(QSettings().value(QStringLiteral("theme/dark"), false).toBool());
+    applyTheme();
 
-    new QShortcut(QKeySequence::New, this, [this] { addTransaction(); });
+    new QShortcut(QKeySequence::New, this, [this] { if (!Popup::isOpen()) addTransaction(); });
     new QShortcut(QKeySequence(Qt::Key_Delete), m_transactionsTable,
-                  [this] { deleteTransaction(); }, Qt::WidgetShortcut);
+                  [this] { if (!Popup::isOpen()) deleteTransaction(); }, Qt::WidgetShortcut);
     new QShortcut(QKeySequence(Qt::Key_Return), m_transactionsTable,
-                  [this] { editTransaction(); }, Qt::WidgetShortcut);
+                  [this] { if (!Popup::isOpen()) editTransaction(); }, Qt::WidgetShortcut);
     new QShortcut(QKeySequence(Qt::Key_Enter), m_transactionsTable,
-                  [this] { editTransaction(); }, Qt::WidgetShortcut);
+                  [this] { if (!Popup::isOpen()) editTransaction(); }, Qt::WidgetShortcut);
 
     refreshAll();
 }
@@ -264,24 +255,25 @@ bool MainWindow::initializeData()
         showError(tr("Impossibile aprire il database: %1").arg(m_manager.lastError()));
         return false;
     }
-
-    int firstAccountId = 0;
-    if (!m_manager.getFirstAccountId(firstAccountId)) {
-        showError(tr("Impossibile leggere gli account: %1").arg(m_manager.lastError()));
+    if (!m_manager.getAccounts(m_accounts)) {
+        showError(tr("Impossibile leggere i conti: %1").arg(m_manager.lastError()));
         return false;
     }
-    if (firstAccountId == 0) {
-        const QString hash = QString::fromLatin1(
-            QCryptographicHash::hash(QByteArrayLiteral("expense-tracker-local-account"),
-                                     QCryptographicHash::Sha256).toHex());
-        if (!m_manager.addAccount(tr("Personale"), hash,
-                                  QDate::currentDate().toString(Qt::ISODate), 0,
-                                  &firstAccountId)) {
-            showError(tr("Impossibile creare l'account iniziale: %1").arg(m_manager.lastError()));
+    if (m_accounts.isEmpty()) {
+        int id = 0;
+        if (!m_manager.addAccount(tr("Conto principale"), placeholderHash(),
+                                  QDate::currentDate().toString(Qt::ISODate), 0, &id) ||
+            !m_manager.getAccounts(m_accounts)) {
+            showError(tr("Impossibile creare il conto iniziale: %1").arg(m_manager.lastError()));
             return false;
         }
     }
-    m_accountId = firstAccountId;
+    m_accountId = m_accounts.first().value(QStringLiteral("ID_Account")).toInt();
+    const int saved = QSettings().value(QStringLiteral("account/active"), 0).toInt();
+    for (const QVariantMap &account : m_accounts) {
+        if (account.value(QStringLiteral("ID_Account")).toInt() == saved)
+            m_accountId = saved;
+    }
 
     if (!m_manager.getCategories(m_categories)) {
         showError(tr("Impossibile caricare le categorie: %1").arg(m_manager.lastError()));
@@ -308,17 +300,60 @@ bool MainWindow::initializeData()
     return true;
 }
 
-void MainWindow::applyTheme(bool dark)
+void MainWindow::applyTheme()
 {
-    m_darkTheme = dark;
-    setStyleSheet(buildStyleSheet(dark ? darkTheme() : lightTheme()));
-    if (m_donut) m_donut->setDarkMode(dark);
-    if (m_bars) m_bars->setDarkMode(dark);
-    if (m_themeButton)
-        m_themeButton->setText(dark ? tr("☀  Tema chiaro") : tr("☾  Tema scuro"));
-    QSettings().setValue(QStringLiteral("theme/dark"), dark);
+    setStyleSheet(buildStyleSheet(m_accent, m_darkTheme));
+    const QColor accent = effectiveAccent(m_accent, m_darkTheme);
+    if (m_donut) {
+        m_donut->setDarkMode(m_darkTheme);
+        m_donut->setAccent(accent);
+    }
+    if (m_bars)
+        m_bars->setDarkMode(m_darkTheme);
+    QSettings settings;
+    settings.setValue(QStringLiteral("theme/dark"), m_darkTheme);
+    settings.setValue(QStringLiteral("theme/accent"), m_accent.name());
+    syncAppearanceControls();
     if (m_balanceValue)
         refreshDashboard();
+}
+
+void MainWindow::setAccent(const QColor &color)
+{
+    if (!color.isValid())
+        return;
+    m_accent = color;
+    applyTheme();
+}
+
+void MainWindow::setDarkTheme(bool dark)
+{
+    m_darkTheme = dark;
+    applyTheme();
+}
+
+void MainWindow::syncAppearanceControls()
+{
+    for (QPushButton *swatch : m_swatches) {
+        const QColor c(swatch->property("color").toString());
+        const bool selected = c.name() == m_accent.name();
+        const QSignalBlocker blocker(swatch);
+        swatch->setChecked(selected);
+        swatch->setText(selected ? QStringLiteral("✓") : QString());
+        swatch->setStyleSheet(
+            QStringLiteral("QPushButton { background: %1; border: none; border-radius: 17px; "
+                           "min-width: 34px; max-width: 34px; min-height: 34px; max-height: 34px; "
+                           "color: %2; font-weight: 700; font-size: 13pt; padding: 0; } "
+                           "QPushButton:hover { border: 3px solid rgba(255, 255, 255, 130); }")
+                .arg(c.name(), readableOn(c).name()));
+    }
+    if (m_lightButton && m_darkButton) {
+        const QSignalBlocker b1(m_lightButton), b2(m_darkButton);
+        m_lightButton->setChecked(!m_darkTheme);
+        m_darkButton->setChecked(m_darkTheme);
+    }
+    if (m_hexEdit && !m_hexEdit->hasFocus())
+        m_hexEdit->setText(m_accent.name().toUpper());
 }
 
 void MainWindow::buildUi()
@@ -330,18 +365,25 @@ void MainWindow::buildUi()
 
     auto *sidebar = new QFrame(root);
     sidebar->setObjectName(QStringLiteral("sidebar"));
-    sidebar->setFixedWidth(220);
+    sidebar->setFixedWidth(230);
     auto *sideLayout = new QVBoxLayout(sidebar);
     sideLayout->setContentsMargins(16, 22, 16, 20);
-    sideLayout->setSpacing(8);
+    sideLayout->setSpacing(6);
     auto *brand = new QLabel(QStringLiteral("◈  Expense Tracker"), sidebar);
     brand->setObjectName(QStringLiteral("brand"));
     sideLayout->addWidget(brand);
 
+    auto *caption = new QLabel(tr("CONTO ATTIVO"), sidebar);
+    caption->setObjectName(QStringLiteral("sidebarCaption"));
+    sideLayout->addWidget(caption);
+    m_accountCombo = new QComboBox(sidebar);
+    sideLayout->addWidget(m_accountCombo);
+    sideLayout->addSpacing(14);
+
     m_pages = new QStackedWidget(root);
     auto *group = new QButtonGroup(this);
     group->setExclusive(true);
-    const QStringList navLabels = {tr("Panoramica"), tr("Transazioni"), tr("Categorie")};
+    const QStringList navLabels = {tr("Panoramica"), tr("Transazioni"), tr("Categorie"), tr("Conti"), tr("Aspetto")};
     for (int i = 0; i < navLabels.size(); ++i) {
         auto *b = button(navLabels[i], "navButton", sidebar);
         b->setCheckable(true);
@@ -352,22 +394,30 @@ void MainWindow::buildUi()
     }
     m_navButtons.first()->setChecked(true);
     sideLayout->addStretch();
-
-    m_themeButton = button(QString(), "themeButton", sidebar);
-    connect(m_themeButton, &QPushButton::clicked, this, [this] { applyTheme(!m_darkTheme); });
-    sideLayout->addWidget(m_themeButton);
     auto *footer = new QLabel(tr("Gestione personale\nDati salvati in locale"), sidebar);
     footer->setObjectName(QStringLiteral("sidebarFooter"));
-    footer->setToolTip(QDir::toNativeSeparators(m_databasePath));
     sideLayout->addWidget(footer);
 
     m_pages->addWidget(buildDashboardPage());
     m_pages->addWidget(buildTransactionsPage());
     m_pages->addWidget(buildCategoriesPage());
+    m_pages->addWidget(buildAccountsPage());
+    m_pages->addWidget(buildAppearancePage());
     rootLayout->addWidget(sidebar);
     rootLayout->addWidget(m_pages, 1);
     setCentralWidget(root);
-    statusBar()->showMessage(tr("Dati salvati in: %1").arg(QDir::toNativeSeparators(m_databasePath)));
+
+    connect(m_accountCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
+        if (index >= 0)
+            switchAccount(m_accountCombo->itemData(index).toInt());
+    });
+
+    m_toast = new QLabel(this);
+    m_toast->setObjectName(QStringLiteral("toast"));
+    m_toast->hide();
+    m_toastTimer = new QTimer(this);
+    m_toastTimer->setSingleShot(true);
+    connect(m_toastTimer, &QTimer::timeout, m_toast, &QWidget::hide);
 }
 
 void MainWindow::showPage(int index)
@@ -377,6 +427,25 @@ void MainWindow::showPage(int index)
         m_navButtons.at(index)->setChecked(true);
     if (index == 1) refreshTransactions();
     if (index == 2) refreshCategories();
+    if (index == 3) refreshAccounts();
+}
+
+void MainWindow::showToast(const QString &text)
+{
+    m_toast->setText(text);
+    m_toast->adjustSize();
+    m_toast->move((width() - m_toast->width()) / 2, height() - m_toast->height() - 30);
+    m_toast->show();
+    m_toast->raise();
+    m_toastTimer->start(2800);
+}
+
+void MainWindow::showError(const QString &message)
+{
+    if (centralWidget())
+        Popup::message(this, tr("Qualcosa non ha funzionato"), message);
+    else
+        QMessageBox::critical(this, tr("Expense Tracker"), message);
 }
 
 QWidget *MainWindow::buildDashboardPage()
@@ -395,13 +464,14 @@ QWidget *MainWindow::buildDashboardPage()
     auto *titles = new QVBoxLayout;
     titles->setSpacing(2);
     titles->addWidget(pageTitle(tr("Panoramica"), page));
-    titles->addWidget(subTitle(tr("Un riepilogo chiaro delle tue finanze."), page));
+    m_dashSubtitle = subTitle(QString(), page);
+    titles->addWidget(m_dashSubtitle);
     header->addLayout(titles, 1);
     auto *initial = button(tr("Saldo iniziale…"), "secondaryButton", page,
-                           tr("Imposta il saldo di partenza del conto"));
+                           tr("Imposta il saldo di partenza del conto attivo"));
     header->addWidget(initial, 0, Qt::AlignTop);
     layout->addLayout(header);
-    connect(initial, &QPushButton::clicked, this, &MainWindow::setInitialBalance);
+    connect(initial, &QPushButton::clicked, this, [this] { setInitialBalance(m_accountId); });
 
     auto *metrics = new QHBoxLayout;
     metrics->setSpacing(14);
@@ -471,16 +541,10 @@ QWidget *MainWindow::buildTransactionsPage()
                               tr("Quest'anno"), tr("Personalizzato…")});
     m_filterCategory = new QComboBox(filters);
     m_filterCategory->addItem(tr("Tutte le categorie"), 0);
-    for (const QVariantMap &category : m_categories)
-        m_filterCategory->addItem(category.value(QStringLiteral("Name")).toString(),
-                                  category.value(QStringLiteral("ID_Category")).toInt());
-    m_filterMin = new QDoubleSpinBox(filters);
-    m_filterMax = new QDoubleSpinBox(filters);
-    for (QDoubleSpinBox *spin : {m_filterMin, m_filterMax}) {
-        spin->setRange(0, 999999999.99);
-        spin->setDecimals(2);
-        spin->setSuffix(QStringLiteral(" €"));
-    }
+    m_filterMin = moneySpin(0);
+    m_filterMax = moneySpin(0);
+    m_filterMin->setParent(filters);
+    m_filterMax->setParent(filters);
     m_filterMin->setPrefix(tr("Min "));
     m_filterMin->setSpecialValueText(tr("Min €"));
     m_filterMax->setPrefix(tr("Max "));
@@ -531,11 +595,14 @@ QWidget *MainWindow::buildTransactionsPage()
 
     auto *actions = new QHBoxLayout;
     auto *add = button(tr("+ Aggiungi"), "primaryButton", page, tr("Ctrl+N"));
+    auto *transfer = button(tr("⇄ Trasferisci"), "secondaryButton", page,
+                            tr("Sposta denaro tra due conti"));
     auto *edit = button(tr("Modifica"), "secondaryButton", page, tr("Invio o doppio clic"));
     auto *remove = button(tr("Elimina"), "secondaryButton", page, tr("Canc"));
     auto *csv = button(tr("Esporta CSV"), "secondaryButton", page,
                        tr("Esporta le transazioni attualmente filtrate"));
     actions->addWidget(add);
+    actions->addWidget(transfer);
     actions->addWidget(edit);
     actions->addWidget(remove);
     actions->addStretch();
@@ -563,6 +630,7 @@ QWidget *MainWindow::buildTransactionsPage()
         refreshTransactions();
     });
     connect(add, &QPushButton::clicked, this, &MainWindow::addTransaction);
+    connect(transfer, &QPushButton::clicked, this, &MainWindow::addTransfer);
     connect(edit, &QPushButton::clicked, this, &MainWindow::editTransaction);
     connect(remove, &QPushButton::clicked, this, &MainWindow::deleteTransaction);
     connect(csv, &QPushButton::clicked, this, &MainWindow::exportCsv);
@@ -583,7 +651,7 @@ QWidget *MainWindow::buildCategoriesPage()
 
     auto *actions = new QHBoxLayout;
     auto *add = button(tr("+ Nuova categoria"), "primaryButton", page);
-    auto *rename = button(tr("Rinomina"), "secondaryButton", page, tr("Invio o doppio clic"));
+    auto *rename = button(tr("Rinomina"), "secondaryButton", page, tr("Doppio clic sulla riga"));
     auto *remove = button(tr("Elimina"), "secondaryButton", page,
                           tr("Si possono eliminare solo le categorie non usate"));
     actions->addWidget(add);
@@ -595,6 +663,150 @@ QWidget *MainWindow::buildCategoriesPage()
     connect(rename, &QPushButton::clicked, this, &MainWindow::renameCategory);
     connect(remove, &QPushButton::clicked, this, &MainWindow::deleteCategory);
     connect(m_categoriesTable, &QTableWidget::cellDoubleClicked, this, [this] { renameCategory(); });
+    return page;
+}
+
+QWidget *MainWindow::buildAccountsPage()
+{
+    auto *page = new QWidget;
+    auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(30, 28, 30, 26);
+    layout->setSpacing(16);
+    layout->addWidget(pageTitle(tr("Conti"), page));
+    layout->addWidget(subTitle(tr("Gestisci più conti e sposta denaro tra di loro. "
+                                  "I trasferimenti non contano come entrate o spese."), page));
+
+    auto *top = new QHBoxLayout;
+    QLabel *total = nullptr;
+    top->addWidget(metricCard(tr("Patrimonio totale"), &total, page));
+    m_totalValue = total;
+    top->addStretch(1);
+    layout->addLayout(top);
+
+    m_accountsTable = makeTable({tr("Conto"), tr("Saldo iniziale"), tr("Saldo attuale")}, page);
+    layout->addWidget(m_accountsTable, 1);
+
+    auto *actions = new QHBoxLayout;
+    auto *add = button(tr("+ Nuovo conto"), "primaryButton", page);
+    auto *transfer = button(tr("⇄ Trasferisci"), "secondaryButton", page, tr("Sposta denaro tra due conti"));
+    auto *rename = button(tr("Rinomina"), "secondaryButton", page);
+    auto *initial = button(tr("Saldo iniziale…"), "secondaryButton", page);
+    auto *remove = button(tr("Elimina"), "secondaryButton", page,
+                          tr("Si possono eliminare solo i conti senza movimenti"));
+    actions->addWidget(add);
+    actions->addWidget(transfer);
+    actions->addWidget(rename);
+    actions->addWidget(initial);
+    actions->addWidget(remove);
+    actions->addStretch();
+    layout->addLayout(actions);
+    connect(add, &QPushButton::clicked, this, &MainWindow::addAccount);
+    connect(transfer, &QPushButton::clicked, this, &MainWindow::addTransfer);
+    connect(rename, &QPushButton::clicked, this, &MainWindow::renameAccount);
+    connect(initial, &QPushButton::clicked, this, [this] {
+        const int id = selectedAccountId();
+        if (id == 0)
+            Popup::message(this, tr("Seleziona un conto"), tr("Seleziona prima un conto dalla tabella."));
+        else
+            setInitialBalance(id);
+    });
+    connect(remove, &QPushButton::clicked, this, &MainWindow::deleteAccount);
+    connect(m_accountsTable, &QTableWidget::cellDoubleClicked, this, [this] {
+        const int id = selectedAccountId();
+        if (id != 0) {
+            switchAccount(id);
+            showPage(0);
+        }
+    });
+    return page;
+}
+
+QWidget *MainWindow::buildAppearancePage()
+{
+    auto *page = new QWidget;
+    auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(30, 28, 30, 26);
+    layout->setSpacing(16);
+    layout->addWidget(pageTitle(tr("Aspetto"), page));
+    layout->addWidget(subTitle(tr("Scegli il colore dell'applicazione: sfondi, pulsanti e grafici si adattano subito."), page));
+
+    QVBoxLayout *colorLayout = nullptr;
+    auto *colorPanel = makePanel(tr("Colore dell'applicazione"), page, &colorLayout);
+    auto *swatchRow = new QHBoxLayout;
+    swatchRow->setSpacing(10);
+    for (const QColor &color : presetColors()) {
+        auto *swatch = new QPushButton(colorPanel);
+        swatch->setCheckable(true);
+        swatch->setCursor(Qt::PointingHandCursor);
+        swatch->setProperty("color", color.name());
+        swatch->setToolTip(color.name().toUpper());
+        m_swatches.append(swatch);
+        swatchRow->addWidget(swatch);
+        connect(swatch, &QPushButton::clicked, this, [this, color] { setAccent(color); });
+    }
+    swatchRow->addStretch();
+    colorLayout->addLayout(swatchRow);
+
+    auto *hexRow = new QHBoxLayout;
+    hexRow->setSpacing(10);
+    m_hexEdit = new QLineEdit(colorPanel);
+    m_hexEdit->setMaxLength(7);
+    m_hexEdit->setPlaceholderText(QStringLiteral("#RRGGBB"));
+    m_hexEdit->setFixedWidth(160);
+    auto *apply = button(tr("Applica"), "primaryButton", colorPanel);
+    auto *restore = button(tr("Ripristina predefinito"), "secondaryButton", colorPanel);
+    hexRow->addWidget(Popup::field(tr("Colore personalizzato"), m_hexEdit, colorPanel));
+    hexRow->addWidget(apply, 0, Qt::AlignBottom);
+    hexRow->addWidget(restore, 0, Qt::AlignBottom);
+    hexRow->addStretch();
+    colorLayout->addLayout(hexRow);
+    m_hexHint = new QLabel(colorPanel);
+    m_hexHint->setObjectName(QStringLiteral("warning"));
+    m_hexHint->hide();
+    colorLayout->addWidget(m_hexHint);
+    layout->addWidget(colorPanel);
+
+    auto applyHex = [this] {
+        QString text = m_hexEdit->text().trimmed();
+        if (!text.startsWith(QLatin1Char('#')))
+            text.prepend(QLatin1Char('#'));
+        const QColor c(text);
+        if (!c.isValid() || text.size() != 7) {
+            m_hexHint->setText(tr("Colore non valido: usa il formato #RRGGBB, per esempio #3B82F6."));
+            m_hexHint->show();
+            return;
+        }
+        m_hexHint->hide();
+        setAccent(c);
+        showToast(tr("Colore applicato"));
+    };
+    connect(apply, &QPushButton::clicked, this, applyHex);
+    connect(m_hexEdit, &QLineEdit::returnPressed, this, applyHex);
+    connect(restore, &QPushButton::clicked, this, [this] {
+        m_hexHint->hide();
+        setAccent(presetColors().first());
+    });
+
+    QVBoxLayout *modeLayout = nullptr;
+    auto *modePanel = makePanel(tr("Modalità"), page, &modeLayout);
+    auto *modeRow = new QHBoxLayout;
+    modeRow->setSpacing(10);
+    m_lightButton = button(tr("☀  Chiaro"), "segment", modePanel);
+    m_darkButton = button(tr("☾  Scuro"), "segment", modePanel);
+    m_lightButton->setCheckable(true);
+    m_darkButton->setCheckable(true);
+    auto *modeGroup = new QButtonGroup(this);
+    modeGroup->setExclusive(true);
+    modeGroup->addButton(m_lightButton);
+    modeGroup->addButton(m_darkButton);
+    modeRow->addWidget(m_lightButton);
+    modeRow->addWidget(m_darkButton);
+    modeRow->addStretch();
+    modeLayout->addLayout(modeRow);
+    layout->addWidget(modePanel);
+    layout->addStretch();
+    connect(m_lightButton, &QPushButton::clicked, this, [this] { setDarkTheme(false); });
+    connect(m_darkButton, &QPushButton::clicked, this, [this] { setDarkTheme(true); });
     return page;
 }
 
@@ -656,12 +868,22 @@ QString MainWindow::categoryName(int categoryId) const
     return tr("Senza categoria");
 }
 
+QString MainWindow::accountName(int accountId) const
+{
+    for (const QVariantMap &account : m_accounts) {
+        if (account.value(QStringLiteral("ID_Account")).toInt() == accountId)
+            return account.value(QStringLiteral("Name")).toString();
+    }
+    return tr("Conto sconosciuto");
+}
+
 void MainWindow::refreshAll()
 {
     if (!m_manager.getCategories(m_categories)) {
         showError(m_manager.lastError());
         return;
     }
+    refreshAccounts();
     {
         const QSignalBlocker blocker(m_filterCategory);
         const int selected = m_filterCategory->currentData().toInt();
@@ -678,12 +900,63 @@ void MainWindow::refreshAll()
     refreshCategories();
 }
 
+void MainWindow::refreshAccounts()
+{
+    if (!m_manager.getAccounts(m_accounts)) {
+        showError(m_manager.lastError());
+        return;
+    }
+    bool activeExists = false;
+    for (const QVariantMap &account : m_accounts)
+        activeExists = activeExists || account.value(QStringLiteral("ID_Account")).toInt() == m_accountId;
+    if (!activeExists && !m_accounts.isEmpty())
+        m_accountId = m_accounts.first().value(QStringLiteral("ID_Account")).toInt();
+
+    {
+        const QSignalBlocker blocker(m_accountCombo);
+        m_accountCombo->clear();
+        for (const QVariantMap &account : m_accounts)
+            m_accountCombo->addItem(account.value(QStringLiteral("Name")).toString(),
+                                    account.value(QStringLiteral("ID_Account")));
+        m_accountCombo->setCurrentIndex(m_accountCombo->findData(m_accountId));
+    }
+
+    qint64 total = 0;
+    m_accountsTable->setRowCount(m_accounts.size());
+    for (int row = 0; row < m_accounts.size(); ++row) {
+        const QVariantMap &account = m_accounts.at(row);
+        const int id = account.value(QStringLiteral("ID_Account")).toInt();
+        const qint64 credit = account.value(QStringLiteral("Credit")).toLongLong();
+        total += credit;
+        auto *name = cell((id == m_accountId ? QStringLiteral("● ") : QString()) +
+                          account.value(QStringLiteral("Name")).toString());
+        name->setData(Qt::UserRole, id);
+        m_accountsTable->setItem(row, 0, name);
+        m_accountsTable->setItem(row, 1, cell(formatMoney(account.value(QStringLiteral("Initial_Credit")).toLongLong()),
+                                              Qt::AlignVCenter | Qt::AlignRight));
+        auto *balance = cell(formatMoney(credit), Qt::AlignVCenter | Qt::AlignRight);
+        balance->setForeground(QColor(credit < 0 ? QStringLiteral("#d94d64") : QString()));
+        m_accountsTable->setItem(row, 2, balance);
+    }
+    m_totalValue->setText(formatMoney(total));
+}
+
+void MainWindow::switchAccount(int accountId)
+{
+    if (accountId == m_accountId || accountId == 0)
+        return;
+    m_accountId = accountId;
+    QSettings().setValue(QStringLiteral("account/active"), accountId);
+    refreshAll();
+}
+
 void MainWindow::fillTransactionRow(QTableWidget *table, int row, const Transaction &t) const
 {
     const QString isoKey = QStringLiteral("%1 %2").arg(t.getDate()).arg(t.getId(), 10, 10, QLatin1Char('0'));
     auto *date = cell(QDate::fromString(t.getDate(), Qt::ISODate).toString(QStringLiteral("dd/MM/yyyy")),
                       Qt::AlignVCenter | Qt::AlignLeft, isoKey);
     date->setData(Qt::UserRole, t.getId());
+    date->setData(Qt::UserRole + 2, false);
     table->setItem(row, 0, date);
     table->setItem(row, 1, cell(categoryName(t.getCategoryId())));
     auto *note = cell(t.getNote());
@@ -697,8 +970,31 @@ void MainWindow::fillTransactionRow(QTableWidget *table, int row, const Transact
     table->setItem(row, 4, amount);
 }
 
+void MainWindow::fillTransferRow(QTableWidget *table, int row, const Transfer &t) const
+{
+    const bool outgoing = t.fromAccountId == m_accountId;
+    const QString isoKey = QStringLiteral("%1 %2").arg(t.date).arg(t.id, 10, 10, QLatin1Char('0'));
+    auto *date = cell(QDate::fromString(t.date, Qt::ISODate).toString(QStringLiteral("dd/MM/yyyy")),
+                      Qt::AlignVCenter | Qt::AlignLeft, isoKey);
+    date->setData(Qt::UserRole, t.id);
+    date->setData(Qt::UserRole + 2, true);
+    table->setItem(row, 0, date);
+    table->setItem(row, 1, cell(outgoing ? tr("→ %1").arg(accountName(t.toAccountId))
+                                         : tr("← %1").arg(accountName(t.fromAccountId))));
+    auto *note = cell(t.note);
+    note->setToolTip(t.note);
+    table->setItem(row, 2, note);
+    table->setItem(row, 3, cell(tr("Trasferimento")));
+    const qint64 signedAmount = outgoing ? -t.amount : t.amount;
+    auto *amount = cell((outgoing ? QStringLiteral("−") : QStringLiteral("+")) + formatMoney(t.amount),
+                        Qt::AlignVCenter | Qt::AlignRight, QVariant::fromValue<qint64>(signedAmount));
+    amount->setForeground(QColor(QStringLiteral("#3b9ae1"))); // neutral: not income, not expense
+    table->setItem(row, 4, amount);
+}
+
 void MainWindow::refreshDashboard()
 {
+    m_dashSubtitle->setText(tr("Conto «%1» · un riepilogo chiaro delle tue finanze.").arg(accountName(m_accountId)));
     Statistics totals;
     qint64 balance = 0;
     if (!m_manager.getStatistics(m_accountId, totals) ||
@@ -730,15 +1026,14 @@ void MainWindow::refreshDashboard()
     m_expensesValue->setText(formatMoney(totals.getTotalExpenses()));
     m_monthValue->setText(formatMoney(monthTotals.getTotalExpenses()));
     m_balanceValue->setStyleSheet(
-        balance < 0 ? QStringLiteral("color:#d94d64;")
-                    : QStringLiteral("color:%1;").arg(m_darkTheme ? "#9a8cff" : "#6658d3"));
+        QStringLiteral("color:%1;").arg(balance < 0 ? QStringLiteral("#d94d64")
+                                                    : effectiveAccent(m_accent, m_darkTheme).name()));
 
     m_recentTable->setRowCount(recent.size());
     for (int row = 0; row < recent.size(); ++row)
         fillTransactionRow(m_recentTable, row, recent.at(row));
     m_recentStack->setCurrentIndex(recent.isEmpty() ? 1 : 0);
 
-    // Top 5 expense categories of the month, everything else grouped as "Altre".
     QList<DonutSlice> slices;
     qint64 others = 0;
     for (int i = 0; i < byCategory.size(); ++i) {
@@ -781,26 +1076,32 @@ void MainWindow::refreshTransactions()
     if (!problem.isEmpty())
         return;
 
+    const TransactionFilter filter = currentFilter();
     QList<Transaction> transactions;
-    if (!m_manager.getTransactions(m_accountId, transactions, currentFilter())) {
+    QList<Transfer> transfers;
+    if (!m_manager.getTransactions(m_accountId, transactions, filter) ||
+        (filter.categoryId == 0 && !m_manager.getTransfers(m_accountId, transfers, filter))) {
         showError(m_manager.lastError());
         return;
     }
     m_visibleTransactions = transactions;
 
     m_transactionsTable->setSortingEnabled(false);
-    m_transactionsTable->setRowCount(transactions.size());
-    for (int row = 0; row < transactions.size(); ++row)
-        fillTransactionRow(m_transactionsTable, row, transactions.at(row));
+    m_transactionsTable->setRowCount(transactions.size() + transfers.size());
+    int row = 0;
+    for (const Transaction &t : transactions)
+        fillTransactionRow(m_transactionsTable, row++, t);
+    for (const Transfer &t : transfers)
+        fillTransferRow(m_transactionsTable, row++, t);
     m_transactionsTable->setSortingEnabled(true); // re-applies the current sort indicator
 
+    const bool empty = transactions.isEmpty() && transfers.isEmpty();
     m_transactionsEmpty->setText(filterIsActive()
-        ? tr("Nessuna transazione corrisponde ai filtri.\nProva a modificarli o premi Reset.")
-        : tr("Nessuna transazione.\nPremi «+ Aggiungi» o Ctrl+N per inserire la prima."));
-    m_transactionsStack->setCurrentIndex(transactions.isEmpty() ? 1 : 0);
+        ? tr("Nessun movimento corrisponde ai filtri.\nProva a modificarli o premi Reset.")
+        : tr("Nessun movimento su questo conto.\nPremi «+ Aggiungi» o Ctrl+N per inserire il primo."));
+    m_transactionsStack->setCurrentIndex(empty ? 1 : 0);
 
-    QString summary = transactions.size() == 1 ? tr("1 transazione")
-                                               : tr("%1 transazioni").arg(transactions.size());
+    QString summary = transactions.size() == 1 ? tr("1 transazione") : tr("%1 transazioni").arg(transactions.size());
     try {
         const Statistics stats(transactions);
         summary += tr("   ·   Entrate %1   ·   Uscite %2   ·   Saldo %3")
@@ -808,6 +1109,8 @@ void MainWindow::refreshTransactions()
                             formatMoney(stats.getBalance()));
     } catch (const std::overflow_error &) {
     }
+    if (!transfers.isEmpty())
+        summary += tr("   ·   %n trasferimenti (esclusi dai totali)", nullptr, transfers.size());
     m_transactionsSummary->setText(summary);
 }
 
@@ -826,20 +1129,25 @@ void MainWindow::refreshCategories()
     }
 }
 
-int MainWindow::selectedTransactionId() const
+MainWindow::RowRef MainWindow::selectedTransactionRow() const
 {
     const int row = m_transactionsTable ? m_transactionsTable->currentRow() : -1;
     if (row < 0 || !m_transactionsTable->item(row, 0))
-        return 0;
-    return m_transactionsTable->item(row, 0)->data(Qt::UserRole).toInt();
+        return {};
+    const QTableWidgetItem *item = m_transactionsTable->item(row, 0);
+    return {item->data(Qt::UserRole).toInt(), item->data(Qt::UserRole + 2).toBool()};
 }
 
 int MainWindow::selectedCategoryId() const
 {
     const int row = m_categoriesTable ? m_categoriesTable->currentRow() : -1;
-    if (row < 0 || !m_categoriesTable->item(row, 0))
-        return 0;
-    return m_categoriesTable->item(row, 0)->data(Qt::UserRole).toInt();
+    return (row < 0 || !m_categoriesTable->item(row, 0)) ? 0 : m_categoriesTable->item(row, 0)->data(Qt::UserRole).toInt();
+}
+
+int MainWindow::selectedAccountId() const
+{
+    const int row = m_accountsTable ? m_accountsTable->currentRow() : -1;
+    return (row < 0 || !m_accountsTable->item(row, 0)) ? 0 : m_accountsTable->item(row, 0)->data(Qt::UserRole).toInt();
 }
 
 bool MainWindow::categoryNameTaken(const QString &name, const QString &type, int excludeId) const
@@ -855,114 +1163,123 @@ bool MainWindow::categoryNameTaken(const QString &name, const QString &type, int
 
 void MainWindow::addTransaction()
 {
-    TransactionDialog dialog(m_categories, m_accountId, this);
-    if (dialog.exec() != QDialog::Accepted)
+    if (Popup::isOpen())
         return;
-    if (!m_manager.addTransaction(dialog.transaction())) {
+    auto *form = new TransactionForm(m_categories, m_accountId);
+    if (!Popup::run(this, tr("Nuova transazione"), form, tr("Salva"), [form] { return form->validate(); }))
+        return;
+    if (!m_manager.addTransaction(form->transaction())) {
         showError(tr("Impossibile salvare la transazione: %1").arg(m_manager.lastError()));
         return;
     }
     refreshAll();
-    statusBar()->showMessage(tr("Transazione aggiunta"), 3000);
+    showToast(tr("Transazione aggiunta"));
 }
 
 void MainWindow::editTransaction()
 {
-    const int id = selectedTransactionId();
-    if (id == 0) {
-        QMessageBox::information(this, tr("Seleziona una transazione"), tr("Seleziona una riga da modificare."));
+    const RowRef ref = selectedTransactionRow();
+    if (ref.id == 0) {
+        Popup::message(this, tr("Seleziona una transazione"), tr("Seleziona una riga da modificare."));
+        return;
+    }
+    if (ref.transfer) {
+        Popup::message(this, tr("Trasferimento"),
+                       tr("I trasferimenti non si possono modificare: eliminalo e creane uno nuovo."));
         return;
     }
     const auto it = std::find_if(m_visibleTransactions.cbegin(), m_visibleTransactions.cend(),
-                                 [id](const Transaction &t) { return t.getId() == id; });
+                                 [&ref](const Transaction &t) { return t.getId() == ref.id; });
     if (it == m_visibleTransactions.cend()) {
         showError(tr("La transazione selezionata non è più disponibile."));
         return;
     }
-    TransactionDialog dialog(m_categories, m_accountId, this);
-    dialog.setTransaction(*it);
-    if (dialog.exec() != QDialog::Accepted)
+    auto *form = new TransactionForm(m_categories, m_accountId);
+    form->setTransaction(*it);
+    if (!Popup::run(this, tr("Modifica transazione"), form, tr("Salva"), [form] { return form->validate(); }))
         return;
-    if (!m_manager.updateTransaction(dialog.transaction())) {
+    if (!m_manager.updateTransaction(form->transaction())) {
         showError(tr("Impossibile modificare la transazione: %1").arg(m_manager.lastError()));
         return;
     }
     refreshAll();
-    statusBar()->showMessage(tr("Transazione modificata"), 3000);
+    showToast(tr("Transazione modificata"));
 }
 
 void MainWindow::deleteTransaction()
 {
-    const int id = selectedTransactionId();
-    if (id == 0) {
-        QMessageBox::information(this, tr("Seleziona una transazione"), tr("Seleziona una riga da eliminare."));
+    const RowRef ref = selectedTransactionRow();
+    if (ref.id == 0) {
+        Popup::message(this, tr("Seleziona una transazione"), tr("Seleziona una riga da eliminare."));
         return;
     }
-    if (QMessageBox::question(this, tr("Conferma eliminazione"),
-                              tr("Vuoi eliminare questa transazione? Il saldo verrà aggiornato.")) != QMessageBox::Yes)
+    const QString text = ref.transfer
+        ? tr("Vuoi eliminare questo trasferimento? I saldi dei due conti verranno ripristinati.")
+        : tr("Vuoi eliminare questa transazione? Il saldo verrà aggiornato.");
+    if (!Popup::confirm(this, tr("Conferma eliminazione"), text, tr("Elimina"), true))
         return;
-    if (!m_manager.deleteTransaction(id)) {
-        showError(tr("Impossibile eliminare la transazione: %1").arg(m_manager.lastError()));
+    const bool ok = ref.transfer ? m_manager.deleteTransfer(ref.id) : m_manager.deleteTransaction(ref.id);
+    if (!ok) {
+        showError(tr("Impossibile eliminare: %1").arg(m_manager.lastError()));
         return;
     }
     refreshAll();
-    statusBar()->showMessage(tr("Transazione eliminata"), 3000);
+    showToast(ref.transfer ? tr("Trasferimento eliminato") : tr("Transazione eliminata"));
 }
 
 void MainWindow::exportCsv()
 {
     const QString problem = filterProblem();
     if (!problem.isEmpty()) {
-        QMessageBox::warning(this, tr("Filtri non validi"), problem);
+        Popup::message(this, tr("Filtri non validi"), problem);
         return;
     }
-    const QString path = QFileDialog::getSaveFileName(
-        this, tr("Esporta transazioni"), QDir::home().filePath(QStringLiteral("transazioni.csv")),
-        tr("File CSV (*.csv)"));
-    if (path.isEmpty())
+    auto *path = new QLineEdit(QDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation))
+                                   .filePath(QStringLiteral("transazioni.csv")));
+    auto *content = column({Popup::field(tr("Percorso del file CSV"), path),
+                            hint(tr("Verranno esportate le transazioni attualmente filtrate del conto attivo "
+                                    "(i trasferimenti sono esclusi)."))});
+    if (!Popup::run(this, tr("Esporta in CSV"), content, tr("Esporta"), [path] {
+            return path->text().trimmed().isEmpty() ? QObject::tr("Inserisci il percorso del file.") : QString();
+        }))
         return;
-    if (!m_manager.exportTransactionsToCsv(m_accountId, path, currentFilter())) {
+    if (!m_manager.exportTransactionsToCsv(m_accountId, path->text().trimmed(), currentFilter())) {
         showError(tr("Esportazione non riuscita: %1").arg(m_manager.lastError()));
         return;
     }
-    statusBar()->showMessage(tr("CSV esportato correttamente"), 4000);
+    showToast(tr("CSV esportato correttamente"));
 }
 
 void MainWindow::addCategory()
 {
-    bool ok = false;
-    const QString name = QInputDialog::getText(this, tr("Nuova categoria"), tr("Nome categoria:"),
-                                               QLineEdit::Normal, QString(), &ok).trimmed();
-    if (!ok)
+    auto *name = new QLineEdit;
+    name->setPlaceholderText(tr("Es. Abbonamenti"));
+    name->setMaxLength(60);
+    auto *type = new QComboBox;
+    type->addItem(tr("Uscita"), QStringLiteral("out"));
+    type->addItem(tr("Entrata"), QStringLiteral("in"));
+    auto *content = column({Popup::field(tr("Nome categoria"), name), Popup::field(tr("Tipo"), type)});
+    if (!Popup::run(this, tr("Nuova categoria"), content, tr("Crea"), [this, name, type] {
+            if (name->text().trimmed().isEmpty())
+                return tr("Inserisci un nome per la categoria.");
+            if (categoryNameTaken(name->text(), type->currentData().toString(), 0))
+                return tr("Esiste già una categoria «%1» di questo tipo.").arg(name->text().trimmed());
+            return QString();
+        }))
         return;
-    if (name.isEmpty()) {
-        QMessageBox::warning(this, tr("Nome mancante"), tr("Inserisci un nome per la categoria."));
-        return;
-    }
-    const QStringList types = {tr("Uscita"), tr("Entrata")};
-    const QString selected = QInputDialog::getItem(this, tr("Tipo categoria"),
-                                                   tr("Questa categoria sarà usata per:"), types, 0, false, &ok);
-    if (!ok)
-        return;
-    const QString type = selected == tr("Entrata") ? QStringLiteral("in") : QStringLiteral("out");
-    if (categoryNameTaken(name, type, 0)) {
-        QMessageBox::warning(this, tr("Categoria già esistente"),
-                             tr("Esiste già una categoria «%1» di questo tipo.").arg(name));
-        return;
-    }
-    if (!m_manager.addCategory(name, type)) {
+    if (!m_manager.addCategory(name->text().trimmed(), type->currentData().toString())) {
         showError(tr("Impossibile creare la categoria: %1").arg(m_manager.lastError()));
         return;
     }
     refreshAll();
-    statusBar()->showMessage(tr("Categoria aggiunta"), 3000);
+    showToast(tr("Categoria aggiunta"));
 }
 
 void MainWindow::renameCategory()
 {
     const int id = selectedCategoryId();
     if (id == 0) {
-        QMessageBox::information(this, tr("Seleziona una categoria"), tr("Seleziona una categoria da rinominare."));
+        Popup::message(this, tr("Seleziona una categoria"), tr("Seleziona una categoria da rinominare."));
         return;
     }
     QString current;
@@ -973,33 +1290,32 @@ void MainWindow::renameCategory()
             type = category.value(QStringLiteral("Type")).toString();
         }
     }
-    bool ok = false;
-    const QString name = QInputDialog::getText(this, tr("Rinomina categoria"), tr("Nuovo nome:"),
-                                               QLineEdit::Normal, current, &ok).trimmed();
-    if (!ok || name == current)
+    auto *name = new QLineEdit(current);
+    name->setMaxLength(60);
+    if (!Popup::run(this, tr("Rinomina categoria"), Popup::field(tr("Nuovo nome"), name), tr("Salva"),
+                    [this, name, type, id] {
+                        if (name->text().trimmed().isEmpty())
+                            return tr("Inserisci un nome per la categoria.");
+                        if (categoryNameTaken(name->text(), type, id))
+                            return tr("Esiste già una categoria «%1» di questo tipo.").arg(name->text().trimmed());
+                        return QString();
+                    }))
         return;
-    if (name.isEmpty()) {
-        QMessageBox::warning(this, tr("Nome mancante"), tr("Inserisci un nome per la categoria."));
+    if (name->text().trimmed() == current)
         return;
-    }
-    if (categoryNameTaken(name, type, id)) {
-        QMessageBox::warning(this, tr("Categoria già esistente"),
-                             tr("Esiste già una categoria «%1» di questo tipo.").arg(name));
-        return;
-    }
-    if (!m_manager.updateCategory(id, name)) {
+    if (!m_manager.updateCategory(id, name->text().trimmed())) {
         showError(tr("Impossibile rinominare la categoria: %1").arg(m_manager.lastError()));
         return;
     }
     refreshAll();
-    statusBar()->showMessage(tr("Categoria rinominata"), 3000);
+    showToast(tr("Categoria rinominata"));
 }
 
 void MainWindow::deleteCategory()
 {
     const int id = selectedCategoryId();
     if (id == 0) {
-        QMessageBox::information(this, tr("Seleziona una categoria"), tr("Seleziona una categoria da eliminare."));
+        Popup::message(this, tr("Seleziona una categoria"), tr("Seleziona una categoria da eliminare."));
         return;
     }
     const QString name = categoryName(id);
@@ -1009,45 +1325,163 @@ void MainWindow::deleteCategory()
         return;
     }
     if (usage > 0) {
-        QMessageBox::information(this, tr("Categoria in uso"),
-                                 tr("La categoria «%1» è usata da %2 transazioni e non può essere eliminata.\n"
-                                    "Modifica o elimina prima quelle transazioni.").arg(name).arg(usage));
+        Popup::message(this, tr("Categoria in uso"),
+                       tr("La categoria «%1» è usata da %2 transazioni e non può essere eliminata.\n"
+                          "Modifica o elimina prima quelle transazioni.").arg(name).arg(usage));
         return;
     }
-    if (QMessageBox::question(this, tr("Conferma eliminazione"),
-                              tr("Vuoi eliminare la categoria «%1»?").arg(name)) != QMessageBox::Yes)
+    if (!Popup::confirm(this, tr("Conferma eliminazione"), tr("Vuoi eliminare la categoria «%1»?").arg(name),
+                        tr("Elimina"), true))
         return;
     if (!m_manager.deleteCategory(id)) {
         showError(tr("Impossibile eliminare la categoria: %1").arg(m_manager.lastError()));
         return;
     }
     refreshAll();
-    statusBar()->showMessage(tr("Categoria eliminata"), 3000);
+    showToast(tr("Categoria eliminata"));
 }
 
-void MainWindow::setInitialBalance()
+void MainWindow::addAccount()
 {
-    qint64 current = 0;
-    if (!m_manager.getAccountInitialCredit(m_accountId, current)) {
+    auto *name = new QLineEdit;
+    name->setPlaceholderText(tr("Es. Carta, Risparmi, Contanti"));
+    name->setMaxLength(60);
+    auto *initial = moneySpin(0);
+    auto *content = column({Popup::field(tr("Nome del conto"), name),
+                            Popup::field(tr("Saldo iniziale"), initial)});
+    if (!Popup::run(this, tr("Nuovo conto"), content, tr("Crea"), [name] { return nameEditError(name); }))
+        return;
+    int id = 0;
+    if (!m_manager.addAccount(name->text().trimmed(), placeholderHash(),
+                              QDate::currentDate().toString(Qt::ISODate), qRound64(initial->value() * 100.0), &id)) {
+        showError(tr("Impossibile creare il conto: %1").arg(m_manager.lastError()));
+        return;
+    }
+    refreshAll();
+    showToast(tr("Conto creato"));
+}
+
+void MainWindow::renameAccount()
+{
+    const int id = selectedAccountId();
+    if (id == 0) {
+        Popup::message(this, tr("Seleziona un conto"), tr("Seleziona prima un conto dalla tabella."));
+        return;
+    }
+    auto *name = new QLineEdit(accountName(id));
+    name->setMaxLength(60);
+    if (!Popup::run(this, tr("Rinomina conto"), Popup::field(tr("Nuovo nome"), name), tr("Salva"),
+                    [name] { return nameEditError(name); }))
+        return;
+    if (!m_manager.renameAccount(id, name->text().trimmed())) {
+        showError(tr("Impossibile rinominare il conto: %1").arg(m_manager.lastError()));
+        return;
+    }
+    refreshAll();
+    showToast(tr("Conto rinominato"));
+}
+
+void MainWindow::deleteAccount()
+{
+    const int id = selectedAccountId();
+    if (id == 0) {
+        Popup::message(this, tr("Seleziona un conto"), tr("Seleziona prima un conto dalla tabella."));
+        return;
+    }
+    const QString name = accountName(id);
+    if (m_accounts.size() <= 1) {
+        Popup::message(this, tr("Impossibile eliminare"), tr("Non puoi eliminare l'ultimo conto rimasto."));
+        return;
+    }
+    QList<Transaction> any;
+    QList<Transfer> transfers;
+    if (!m_manager.getRecentTransactions(id, 1, any) || !m_manager.getTransfers(id, transfers)) {
         showError(m_manager.lastError());
         return;
     }
-    bool ok = false;
-    const double value = QInputDialog::getDouble(
-        this, tr("Saldo iniziale"),
-        tr("Saldo del conto prima della prima transazione (€).\nIl saldo attuale verrà aggiornato di conseguenza:"),
-        current / 100.0, 0.0, 999999999.99, 2, &ok);
-    if (!ok)
+    if (!any.isEmpty() || !transfers.isEmpty()) {
+        Popup::message(this, tr("Conto con movimenti"),
+                       tr("Il conto «%1» contiene transazioni o trasferimenti e non può essere eliminato.").arg(name));
         return;
-    if (!m_manager.setAccountInitialCredit(m_accountId, qRound64(value * 100.0))) {
+    }
+    if (!Popup::confirm(this, tr("Conferma eliminazione"), tr("Vuoi eliminare il conto «%1»?").arg(name),
+                        tr("Elimina"), true))
+        return;
+    if (!m_manager.deleteAccount(id)) {
+        showError(tr("Impossibile eliminare il conto: %1").arg(m_manager.lastError()));
+        return;
+    }
+    refreshAll();
+    showToast(tr("Conto eliminato"));
+}
+
+void MainWindow::setInitialBalance(int accountId)
+{
+    qint64 current = 0;
+    if (!m_manager.getAccountInitialCredit(accountId, current)) {
+        showError(m_manager.lastError());
+        return;
+    }
+    auto *spin = moneySpin(0, current / 100.0);
+    auto *content = column({Popup::field(tr("Saldo iniziale"), spin),
+                            hint(tr("Il saldo attuale del conto «%1» verrà aggiornato di conseguenza.").arg(accountName(accountId)))});
+    if (!Popup::run(this, tr("Saldo iniziale"), content, tr("Salva")))
+        return;
+    if (!m_manager.setAccountInitialCredit(accountId, qRound64(spin->value() * 100.0))) {
         showError(tr("Impossibile aggiornare il saldo iniziale: %1").arg(m_manager.lastError()));
         return;
     }
     refreshAll();
-    statusBar()->showMessage(tr("Saldo iniziale aggiornato"), 3000);
+    showToast(tr("Saldo iniziale aggiornato"));
 }
 
-void MainWindow::showError(const QString &message)
+void MainWindow::addTransfer()
 {
-    QMessageBox::critical(this, tr("Expense Tracker"), message);
+    if (Popup::isOpen())
+        return;
+    if (m_accounts.size() < 2) {
+        Popup::message(this, tr("Servono due conti"),
+                       tr("Per trasferire denaro crea almeno due conti dalla pagina Conti."));
+        return;
+    }
+    auto *from = new QComboBox;
+    auto *to = new QComboBox;
+    for (const QVariantMap &account : m_accounts) {
+        const QString label = QStringLiteral("%1  ·  %2")
+                                  .arg(account.value(QStringLiteral("Name")).toString(),
+                                       formatMoney(account.value(QStringLiteral("Credit")).toLongLong()));
+        from->addItem(label, account.value(QStringLiteral("ID_Account")));
+        to->addItem(label, account.value(QStringLiteral("ID_Account")));
+    }
+    from->setCurrentIndex(from->findData(m_accountId));
+    to->setCurrentIndex(from->currentIndex() == 0 ? 1 : 0);
+    auto *amount = moneySpin(0.01, 1.0);
+    auto *date = new QDateEdit(QDate::currentDate());
+    date->setCalendarPopup(true);
+    date->setDisplayFormat(QStringLiteral("dd/MM/yyyy"));
+    auto *note = new QLineEdit;
+    note->setMaxLength(200);
+    note->setPlaceholderText(tr("Facoltativa, es. Risparmio mensile"));
+
+    auto *row = new QWidget;
+    auto *rowLayout = new QHBoxLayout(row);
+    rowLayout->setContentsMargins(0, 0, 0, 0);
+    rowLayout->setSpacing(12);
+    rowLayout->addWidget(Popup::field(tr("Importo"), amount));
+    rowLayout->addWidget(Popup::field(tr("Data"), date));
+    auto *content = column({Popup::field(tr("Da"), from), Popup::field(tr("A"), to), row,
+                            Popup::field(tr("Nota"), note)});
+    if (!Popup::run(this, tr("Trasferisci denaro"), content, tr("Trasferisci"), [from, to] {
+            return from->currentData().toInt() == to->currentData().toInt()
+                       ? QObject::tr("Scegli due conti diversi.") : QString();
+        }))
+        return;
+    if (!m_manager.addTransfer(from->currentData().toInt(), to->currentData().toInt(),
+                               qRound64(amount->value() * 100.0), date->date().toString(Qt::ISODate),
+                               note->text().trimmed())) {
+        showError(tr("Impossibile eseguire il trasferimento: %1").arg(m_manager.lastError()));
+        return;
+    }
+    refreshAll();
+    showToast(tr("Trasferimento eseguito"));
 }

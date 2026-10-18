@@ -13,7 +13,9 @@ qt_add_executable(ExpenseTracker
     src/main.cpp
     src/MainWindow.cpp
     src/ChartWidgets.cpp
-    src/TransactionDialog.cpp
+    src/TransactionForm.cpp
+    src/Popup.cpp
+    src/Theme.cpp
     src/Database.cpp
     src/ExpenseManager.cpp
     src/Transaction.cpp
@@ -21,7 +23,10 @@ qt_add_executable(ExpenseTracker
     include/MainWindow.h
     include/ChartWidgets.h
     include/Format.h
-    include/TransactionDialog.h
+    include/TransactionForm.h
+    include/Popup.h
+    include/Theme.h
+    include/Transfer.h
     include/Database.h
     include/ExpenseManager.h
     include/Statistics.h

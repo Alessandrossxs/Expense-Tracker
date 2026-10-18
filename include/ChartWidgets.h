@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QColor>
 #include <QList>
 #include <QString>
 #include <QWidget>
@@ -28,6 +29,7 @@ public:
                  const QString &centerCaption);
     void setEmptyText(const QString &text);
     void setDarkMode(bool dark);
+    void setAccent(const QColor &accent);
     QSize sizeHint() const override;
     QSize minimumSizeHint() const override;
 
@@ -35,6 +37,7 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
+    QColor m_accent{QStringLiteral("#6658d3")};
     QList<DonutSlice> m_slices;
     QString m_centerValue;
     QString m_centerCaption;

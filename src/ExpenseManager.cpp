@@ -141,6 +141,37 @@ bool ExpenseManager::getMonthlyTotals(int accountId, const QString &fromDate, QL
     return recordResult(m_database.getMonthlyTotals(accountId, fromDate, totals));
 }
 
+bool ExpenseManager::getAccounts(QList<QVariantMap> &accounts)
+{
+    return recordResult(m_database.getAccounts(accounts));
+}
+
+bool ExpenseManager::renameAccount(int accountId, const QString &name)
+{
+    return recordResult(m_database.renameAccount(accountId, name));
+}
+
+bool ExpenseManager::deleteAccount(int accountId)
+{
+    return recordResult(m_database.deleteAccount(accountId));
+}
+
+bool ExpenseManager::addTransfer(int fromAccountId, int toAccountId, qint64 amount, const QString &date,
+                                 const QString &note, int *newId)
+{
+    return recordResult(m_database.addTransfer(fromAccountId, toAccountId, amount, date, note, newId));
+}
+
+bool ExpenseManager::deleteTransfer(int transferId)
+{
+    return recordResult(m_database.deleteTransfer(transferId));
+}
+
+bool ExpenseManager::getTransfers(int accountId, QList<Transfer> &transfers, const TransactionFilter &filter)
+{
+    return recordResult(m_database.getTransfers(accountId, transfers, filter));
+}
+
 bool ExpenseManager::getStatistics(
     int accountId,
     Statistics &statistics,

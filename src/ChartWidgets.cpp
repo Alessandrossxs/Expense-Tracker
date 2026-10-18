@@ -17,8 +17,10 @@ QColor gridColor(bool dark) { return QColor(dark ? "#2a2e45" : "#e7eaf1"); }
 const QColor kIncomeColor(QStringLiteral("#16845b"));
 const QColor kExpenseColor(QStringLiteral("#d94d64"));
 
-QColor sliceColor(int index, bool other)
+QColor sliceColor(int index, bool other, const QColor &accent)
 {
+    if (index == 0 && !other)
+        return accent;
     static const char *palette[] = {"#6658d3", "#2fa37c", "#e8a33d", "#d94d64", "#3b9ae1"};
     return other ? QColor(QStringLiteral("#9aa3b8")) : QColor(QLatin1String(palette[index % 5]));
 }
@@ -46,6 +48,7 @@ void DonutChart::setData(const QList<DonutSlice> &slices, const QString &centerV
 
 void DonutChart::setEmptyText(const QString &text) { m_emptyText = text; update(); }
 void DonutChart::setDarkMode(bool dark) { m_dark = dark; update(); }
+void DonutChart::setAccent(const QColor &accent) { m_accent = accent; update(); }
 QSize DonutChart::sizeHint() const { return {420, 220}; }
 QSize DonutChart::minimumSizeHint() const { return {300, 190}; }
 
@@ -71,7 +74,7 @@ void DonutChart::paintEvent(QPaintEvent *)
     for (int i = 0; i < m_slices.size(); ++i) {
         accumulated += m_slices.at(i).value;
         const int end = 90 * 16 - qRound(360.0 * 16.0 * double(accumulated) / double(total));
-        QPen pen(sliceColor(i, m_slices.at(i).other), ringWidth);
+        QPen pen(sliceColor(i, m_slices.at(i).other, m_accent), ringWidth);
         pen.setCapStyle(Qt::FlatCap);
         p.setPen(pen);
         p.drawArc(arc, start, end - start);
@@ -100,7 +103,7 @@ void DonutChart::paintEvent(QPaintEvent *)
     for (int i = 0; i < count; ++i, y += rowH) {
         const DonutSlice &s = m_slices.at(i);
         p.setPen(Qt::NoPen);
-        p.setBrush(sliceColor(i, s.other));
+        p.setBrush(sliceColor(i, s.other, m_accent));
         p.drawRoundedRect(QRect(x0, y + rowH / 2 - 5, 10, 10), 3, 3);
         const int valueW = fm.horizontalAdvance(s.valueText);
         const QRect valueRect(right - valueW, y, valueW, rowH);

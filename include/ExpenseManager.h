@@ -30,6 +30,14 @@ public:
         int *newId = nullptr);
     bool getAccountBalance(int accountId, qint64 &balance);
     bool getFirstAccountId(int &accountId);
+    bool getAccounts(QList<QVariantMap> &accounts);
+    bool renameAccount(int accountId, const QString &name);
+    bool deleteAccount(int accountId);
+    bool addTransfer(int fromAccountId, int toAccountId, qint64 amount, const QString &date,
+                     const QString &note, int *newId = nullptr);
+    bool deleteTransfer(int transferId);
+    bool getTransfers(int accountId, QList<Transfer> &transfers,
+                      const TransactionFilter &filter = TransactionFilter{});
     bool getAccountInitialCredit(int accountId, qint64 &initialCredit);
     bool setAccountInitialCredit(int accountId, qint64 initialCredit);
 

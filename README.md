@@ -4,17 +4,19 @@ A C++ application for managing personal income and expenses, tracking financial 
 
 ## Features
 
-- Qt desktop interface with three pages: **Panoramica** (dashboard), **Transazioni**, and **Categorie**
+- Qt desktop interface with five pages: **Panoramica**, **Transazioni**, **Categorie**, **Conti**, and **Aspetto**
 - Dashboard with current balance, total income, total expenses, this month's expenses, a spending-by-category chart, a 6-month income/expense chart, and the latest transactions
+- Multiple accounts, switchable from the sidebar; create, rename, delete (empty accounts only) and set each account's initial balance
+- Transfers between accounts, kept apart from income and expenses so they never count as earnings or spending
 - Add, edit, and delete transactions, each with an optional note
 - Sortable transaction table (click a column header) with a totals line for the filtered list
 - Filter by period (all, this month, last 30 days, this year, custom range), category, and amount range; filters apply instantly
 - Add, rename, and delete categories (a category in use cannot be deleted; duplicate names are rejected)
-- Set the account's initial balance
-- Light and dark theme (remembered between launches)
+- **Aspetto** page: pick the application color (presets or any `#RRGGBB`) and light/dark mode; backgrounds, buttons, selections and charts follow, and the choice is remembered
+- Forms and confirmations open as in-app popups, with short notifications instead of extra windows
 - Keyboard shortcuts: `Ctrl+N` new transaction, `Enter` edit, `Del` delete
-- Store accounts, categories, transactions, and balances in SQLite
-- Export filtered transaction data to CSV (`transaction_id,account_id,category_id,date,type,amount_cents,note`)
+- Store accounts, categories, transactions, transfers, and balances in SQLite
+- Export filtered transaction data of the active account to CSV (`transaction_id,account_id,category_id,date,type,amount_cents,note`; transfers are not included)
 
 ## Technologies
 
@@ -64,7 +66,7 @@ Run the application from the directory where you want the data to live:
 On first launch the app creates a SQLite database named `expense_tracker.db` in
 the per-user application data folder (for example
 `%APPDATA%\Alessandro\Expense Tracker` on Windows), together with a default
-account and default categories. The full path is shown in the status bar. If a
+account and default categories. If a
 database named `expense_tracker.db` exists in the directory you launch the app
 from (older versions stored it there), it is copied to the new location on the
 first run. Databases created by earlier versions are upgraded automatically.

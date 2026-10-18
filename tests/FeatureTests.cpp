@@ -156,6 +156,48 @@ void testInitialCreditAndAggregates(const QString &dir)
     check(db.getRecentTransactions(acc, 2, recent) && recent.size() == 2, "recent size");
     check(recent.value(0).getDate() == QStringLiteral("2026-02-11"), "recent order");
 }
+
+void testAccountsAndTransfers(const QString &dir)
+{
+    Database db(dir + QStringLiteral("/transfer.sqlite"));
+    check(db.open(), "open");
+    int a = 0, b = 0, cat = 0;
+    db.addAccount(QStringLiteral("Conto A"), QStringLiteral("h"), QStringLiteral("2026-01-01"), 10000, &a);
+    check(!db.deleteAccount(a), "last account deleted");
+    db.addAccount(QStringLiteral("Conto B"), QStringLiteral("h"), QStringLiteral("2026-01-01"), 0, &b);
+    QList<QVariantMap> accounts;
+    check(db.getAccounts(accounts) && accounts.size() == 2, "accounts list");
+    check(db.renameAccount(b, QStringLiteral(" Risparmi ")) && db.getAccounts(accounts) &&
+              accounts.at(1).value(QStringLiteral("Name")).toString() == QStringLiteral("Risparmi"), "rename");
+    check(!db.renameAccount(b, QStringLiteral("  ")), "empty account name");
+
+    int transferId = 0;
+    check(db.addTransfer(a, b, 2500, QStringLiteral("2026-02-01"), QStringLiteral("risparmio"), &transferId), "transfer");
+    qint64 balA = 0, balB = 0;
+    check(db.getAccountBalance(a, balA) && db.getAccountBalance(b, balB) && balA == 7500 && balB == 2500, "balances");
+    check(!db.addTransfer(a, a, 100, QStringLiteral("2026-02-01"), QString()), "same account accepted");
+    check(!db.addTransfer(a, b, 0, QStringLiteral("2026-02-01"), QString()), "zero amount accepted");
+    check(!db.addTransfer(a, b, 100, QStringLiteral("nope"), QString()), "bad date accepted");
+    check(!db.addTransfer(a, 999, 100, QStringLiteral("2026-02-01"), QString()), "unknown account accepted");
+    check(db.getAccountBalance(a, balA) && balA == 7500, "failed transfer changed balance");
+
+    // Transfers are neither income nor expenses.
+    qint64 in = 0, out = 0;
+    check(db.getTotals(a, in, out) && in == 0 && out == 0, "transfer counted in totals");
+    QList<Transfer> list;
+    check(db.getTransfers(a, list) && list.size() == 1 && list.first().note == QStringLiteral("risparmio"), "list A");
+    check(db.getTransfers(b, list) && list.size() == 1, "list B");
+    TransactionFilter big;
+    big.minimumAmount = 5000;
+    check(db.getTransfers(a, list, big) && list.isEmpty(), "amount filter");
+    check(!db.deleteAccount(b), "account with transfers deleted");
+
+    check(db.deleteTransfer(transferId), "delete transfer");
+    check(db.getAccountBalance(a, balA) && db.getAccountBalance(b, balB) && balA == 10000 && balB == 0, "balances restored");
+    check(!db.deleteTransfer(transferId), "deleting twice");
+    check(db.deleteAccount(b), "empty account not deleted");
+    Q_UNUSED(cat);
+}
 }
 
 int main(int argc, char *argv[])
@@ -167,5 +209,6 @@ int main(int argc, char *argv[])
     testNotesAndCsv(dir.path());
     testCategories(dir.path());
     testInitialCreditAndAggregates(dir.path());
+    testAccountsAndTransfers(dir.path());
     return g_failures == 0 ? 0 : 1;
 }
