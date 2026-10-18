@@ -5,12 +5,16 @@ A C++ application for managing personal income and expenses, tracking financial 
 ## Features
 
 - Qt desktop interface with three pages: **Panoramica** (dashboard), **Transazioni**, and **Categorie**
-- Dashboard with current balance, total income, total expenses, this month's expenses, and recent transactions
-- Add, edit, and delete transactions
-- Organize transactions by category (default categories are created on first launch; new ones can be added from the UI)
-- Filter transactions by date range, category, and amount range
+- Dashboard with current balance, total income, total expenses, this month's expenses, a spending-by-category chart, a 6-month income/expense chart, and the latest transactions
+- Add, edit, and delete transactions, each with an optional note
+- Sortable transaction table (click a column header) with a totals line for the filtered list
+- Filter by period (all, this month, last 30 days, this year, custom range), category, and amount range; filters apply instantly
+- Add, rename, and delete categories (a category in use cannot be deleted; duplicate names are rejected)
+- Set the account's initial balance
+- Light and dark theme (remembered between launches)
+- Keyboard shortcuts: `Ctrl+N` new transaction, `Enter` edit, `Del` delete
 - Store accounts, categories, transactions, and balances in SQLite
-- Export filtered transaction data to CSV
+- Export filtered transaction data to CSV (`transaction_id,account_id,category_id,date,type,amount_cents,note`)
 
 ## Technologies
 
@@ -57,10 +61,13 @@ Run the application from the directory where you want the data to live:
 ./build/ExpenseTracker
 ```
 
-On first launch the app creates a SQLite database named `expense_tracker.db`
-in the **current working directory**, together with a default account and a set
-of default categories. Launching it from a different directory creates or opens
-a different database. The `.db` file is ignored by Git.
+On first launch the app creates a SQLite database named `expense_tracker.db` in
+the per-user application data folder (for example
+`%APPDATA%\Alessandro\Expense Tracker` on Windows), together with a default
+account and default categories. The full path is shown in the status bar. If a
+database named `expense_tracker.db` exists in the directory you launch the app
+from (older versions stored it there), it is copied to the new location on the
+first run. Databases created by earlier versions are upgraded automatically.
 
 ## Amounts, accounts, and filters
 

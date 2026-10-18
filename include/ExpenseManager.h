@@ -29,12 +29,18 @@ public:
         qint64 initialCredit,
         int *newId = nullptr);
     bool getAccountBalance(int accountId, qint64 &balance);
+    bool getFirstAccountId(int &accountId);
+    bool getAccountInitialCredit(int accountId, qint64 &initialCredit);
+    bool setAccountInitialCredit(int accountId, qint64 initialCredit);
 
     bool addCategory(
         const QString &name,
         const QString &type,
         int *newId = nullptr);
     bool getCategories(QList<QVariantMap> &categories);
+    bool updateCategory(int categoryId, const QString &name);
+    bool deleteCategory(int categoryId);
+    bool getCategoryUsage(int categoryId, int &transactionCount);
 
     bool addTransaction(const Transaction &transaction);
     bool updateTransaction(const Transaction &transaction);
@@ -43,6 +49,12 @@ public:
         int accountId,
         QList<Transaction> &transactions,
         const TransactionFilter &filter = TransactionFilter{});
+    bool getRecentTransactions(int accountId, int count, QList<Transaction> &transactions);
+    bool getExpensesByCategory(
+        int accountId,
+        const TransactionFilter &filter,
+        QList<CategoryTotal> &totals);
+    bool getMonthlyTotals(int accountId, const QString &fromDate, QList<MonthlyTotal> &totals);
     bool getStatistics(
         int accountId,
         Statistics &statistics,

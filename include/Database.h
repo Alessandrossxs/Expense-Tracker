@@ -5,6 +5,8 @@
 #include <QList>
 #include <QVariant>
 
+#include "Statistics.h"
+
 class Transaction;
 
 struct TransactionFilter
@@ -48,6 +50,9 @@ public:
         int *newId = nullptr);
 
     bool getAccountBalance(int accountId, qint64 &balance);
+    bool getFirstAccountId(int &accountId); // 0 when no account exists
+    bool getAccountInitialCredit(int accountId, qint64 &initialCredit);
+    bool setAccountInitialCredit(int accountId, qint64 initialCredit);
 
     // Categorie condivise
     bool addCategory(
@@ -56,6 +61,9 @@ public:
         int *newId = nullptr);
 
     bool getCategories(QList<QVariantMap> &categories);
+    bool updateCategory(int categoryId, const QString &name);
+    bool deleteCategory(int categoryId);
+    bool getCategoryUsage(int categoryId, int &transactionCount);
 
     // Transazioni
     bool addTransaction(const Transaction &transaction);
@@ -66,4 +74,20 @@ public:
         int accountId,
         QList<Transaction> &transactions,
         const TransactionFilter &filter = TransactionFilter{});
+    bool getRecentTransactions(int accountId, int count, QList<Transaction> &transactions);
+
+    // Aggregati calcolati in SQL
+    bool getTotals(
+        int accountId,
+        qint64 &income,
+        qint64 &expenses,
+        const TransactionFilter &filter = TransactionFilter{});
+    bool getExpensesByCategory(
+        int accountId,
+        const TransactionFilter &filter,
+        QList<CategoryTotal> &totals);
+    bool getMonthlyTotals(
+        int accountId,
+        const QString &fromDate,
+        QList<MonthlyTotal> &totals);
 };

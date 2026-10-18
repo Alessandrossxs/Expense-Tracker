@@ -9,6 +9,7 @@
 class QComboBox;
 class QDateEdit;
 class QDoubleSpinBox;
+class QLineEdit;
 
 class TransactionDialog : public QDialog
 {
@@ -28,5 +29,6 @@ private:
     QComboBox *m_category = nullptr;
     QDateEdit *m_date = nullptr;
     QDoubleSpinBox *m_amount = nullptr;
+    QLineEdit *m_note = nullptr;
     void reloadCategories(int preferredCategory = 0);
 };

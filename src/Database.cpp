@@ -3,6 +3,7 @@
 #include "Transaction.h"
 
 #include <QDate>
+#include <QHash>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QUuid>
@@ -108,6 +109,8 @@ bool isValidTransaction(const Transaction &transaction, QString &lastError)
         lastError = QStringLiteral("Category ID must be positive");
     } else if (transaction.getAmount() <= 0) {
         lastError = QStringLiteral("Transaction amount must be positive");
+    } else if (transaction.getNote().trimmed().size() > 500) {
+        lastError = QStringLiteral("Transaction note cannot exceed 500 characters");
     } else if (!isValidIsoDate(transaction.getDate())) {
         lastError = QStringLiteral("Transaction date must be a valid ISO date (YYYY-MM-DD)");
     } else {
@@ -124,6 +127,91 @@ QString transactionType(bool isIncome)
 qint64 signedAmount(qint64 amount, bool isIncome)
 {
     return isIncome ? amount : -amount;
+}
+
+// A null QString would be bound as SQL NULL; the Note column is NOT NULL.
+QString noteForStorage(const Transaction &transaction)
+{
+    const QString note = transaction.getNote().trimmed();
+    return note.isNull() ? QString(QLatin1String("")) : note;
+}
+
+const char *kTransactionColumns =
+    "ID_Transaction, ID_Account, ID_Category, Date, Amount, Type, Note";
+
+Transaction transactionFromQuery(const QSqlQuery &query)
+{
+    return Transaction(
+        query.value(0).toInt(),
+        query.value(1).toInt(),
+        query.value(2).toInt(),
+        query.value(3).toString(),
+        query.value(4).toLongLong(),
+        query.value(5).toString() == QStringLiteral("in"),
+        query.value(6).toString());
+}
+
+bool validateFilter(const TransactionFilter &filter, QString &lastError)
+{
+    if ((!filter.dateFrom.isEmpty() && !isValidIsoDate(filter.dateFrom)) ||
+        (!filter.dateTo.isEmpty() && !isValidIsoDate(filter.dateTo))) {
+        lastError = QStringLiteral("Transaction filter dates must be valid ISO dates (YYYY-MM-DD)");
+    } else if (!filter.dateFrom.isEmpty() && !filter.dateTo.isEmpty() &&
+               filter.dateFrom > filter.dateTo) {
+        lastError = QStringLiteral("Transaction filter start date must not be after end date");
+    } else if (filter.categoryId < 0) {
+        lastError = QStringLiteral("Category filter ID cannot be negative");
+    } else if (filter.minimumAmount < 0 || filter.maximumAmount < 0 ||
+               (filter.maximumAmount != 0 && filter.minimumAmount > filter.maximumAmount)) {
+        lastError = QStringLiteral("Transaction amount filter range is invalid");
+    } else {
+        return true;
+    }
+    return false;
+}
+
+QString filterClauses(const TransactionFilter &filter)
+{
+    QString sql;
+    if (!filter.dateFrom.isEmpty()) sql += QStringLiteral(" AND Date >= ?");
+    if (!filter.dateTo.isEmpty()) sql += QStringLiteral(" AND Date <= ?");
+    if (filter.categoryId > 0) sql += QStringLiteral(" AND ID_Category = ?");
+    if (filter.minimumAmount > 0) sql += QStringLiteral(" AND Amount >= ?");
+    if (filter.maximumAmount > 0) sql += QStringLiteral(" AND Amount <= ?");
+    return sql;
+}
+
+void bindFilter(QSqlQuery &query, const TransactionFilter &filter)
+{
+    if (!filter.dateFrom.isEmpty()) query.addBindValue(filter.dateFrom);
+    if (!filter.dateTo.isEmpty()) query.addBindValue(filter.dateTo);
+    if (filter.categoryId > 0) query.addBindValue(filter.categoryId);
+    if (filter.minimumAmount > 0) query.addBindValue(filter.minimumAmount);
+    if (filter.maximumAmount > 0) query.addBindValue(filter.maximumAmount);
+}
+
+// Sets `exists` when another category of the same type already has this name.
+bool categoryNameExists(
+    QSqlDatabase &database,
+    const QString &name,
+    const QString &type,
+    int excludeId,
+    bool &exists,
+    QString &lastError)
+{
+    QSqlQuery query(database);
+    query.prepare(QStringLiteral(
+        "SELECT COUNT(*) FROM Category "
+        "WHERE Name = ? COLLATE NOCASE AND Type = ? AND ID_Category <> ?"));
+    query.addBindValue(name);
+    query.addBindValue(type);
+    query.addBindValue(excludeId);
+    if (!query.exec() || !query.next()) {
+        setQueryError(lastError, QStringLiteral("Failed to check category name"), query);
+        return false;
+    }
+    exists = query.value(0).toInt() > 0;
+    return true;
 }
 }
 
@@ -211,6 +299,7 @@ bool Database::initialize()
             "Type TEXT NOT NULL CHECK (Type IN ('in', 'out')), "
             "ID_Category INTEGER NOT NULL, "
             "ID_Account INTEGER NOT NULL, "
+            "Note TEXT NOT NULL DEFAULT '', "
             "FOREIGN KEY (ID_Category) REFERENCES Category(ID_Category) "
             "ON UPDATE RESTRICT ON DELETE RESTRICT, "
             "FOREIGN KEY (ID_Account) REFERENCES Bank_Account(ID_Account) "
@@ -234,6 +323,23 @@ bool Database::initialize()
 
     for (const QString &statement : statements) {
         if (!execute(statement)) {
+            return rollbackWithError(m_db, m_lastError);
+        }
+    }
+    // Migration: databases created before the note feature lack the Note column.
+    {
+        QSqlQuery columns(m_db);
+        if (!columns.exec(QStringLiteral("PRAGMA table_info(Transactions)"))) {
+            setQueryError(m_lastError, QStringLiteral("Failed to inspect schema"), columns);
+            return rollbackWithError(m_db, m_lastError);
+        }
+        bool hasNote = false;
+        while (columns.next()) {
+            if (columns.value(1).toString() == QStringLiteral("Note")) hasNote = true;
+        }
+        columns.finish();
+        if (!hasNote && !execute(QStringLiteral(
+                "ALTER TABLE Transactions ADD COLUMN Note TEXT NOT NULL DEFAULT ''"))) {
             return rollbackWithError(m_db, m_lastError);
         }
     }
@@ -365,6 +471,15 @@ bool Database::addCategory(
         return false;
     }
 
+    bool exists = false;
+    if (!categoryNameExists(m_db, name.trimmed(), type, 0, exists, m_lastError)) {
+        return false;
+    }
+    if (exists) {
+        m_lastError = QStringLiteral("A category with this name already exists");
+        return false;
+    }
+
     QSqlQuery query(m_db);
     query.prepare(QStringLiteral("INSERT INTO Category (Name, Type) VALUES (?, ?)"));
     query.addBindValue(name.trimmed());
@@ -438,13 +553,14 @@ bool Database::addTransaction(const Transaction &transaction)
     QSqlQuery query(m_db);
     query.prepare(
         QStringLiteral(
-            "INSERT INTO Transactions (Amount, Date, Type, ID_Category, ID_Account) "
-            "VALUES (?, ?, ?, ?, ?)"));
+            "INSERT INTO Transactions (Amount, Date, Type, ID_Category, ID_Account, Note) "
+            "VALUES (?, ?, ?, ?, ?, ?)"));
     query.addBindValue(transaction.getAmount());
     query.addBindValue(transaction.getDate());
     query.addBindValue(type);
     query.addBindValue(transaction.getCategoryId());
     query.addBindValue(transaction.getAccountId());
+    query.addBindValue(noteForStorage(transaction));
     if (!query.exec()) {
         setQueryError(m_lastError, QStringLiteral("Failed to create transaction"), query);
         return rollbackWithError(m_db, m_lastError);
@@ -522,13 +638,14 @@ bool Database::updateTransaction(const Transaction &transaction)
     updateQuery.prepare(
         QStringLiteral(
             "UPDATE Transactions "
-            "SET Amount = ?, Date = ?, Type = ?, ID_Category = ?, ID_Account = ? "
+            "SET Amount = ?, Date = ?, Type = ?, ID_Category = ?, ID_Account = ?, Note = ? "
             "WHERE ID_Transaction = ?"));
     updateQuery.addBindValue(transaction.getAmount());
     updateQuery.addBindValue(transaction.getDate());
     updateQuery.addBindValue(newType);
     updateQuery.addBindValue(transaction.getCategoryId());
     updateQuery.addBindValue(transaction.getAccountId());
+    updateQuery.addBindValue(noteForStorage(transaction));
     updateQuery.addBindValue(transaction.getId());
     if (!updateQuery.exec()) {
         setQueryError(m_lastError, QStringLiteral("Failed to update transaction"), updateQuery);
@@ -619,64 +736,17 @@ bool Database::getTransactions(
         m_lastError = QStringLiteral("Account ID must be positive");
         return false;
     }
-    if ((!filter.dateFrom.isEmpty() && !isValidIsoDate(filter.dateFrom)) ||
-        (!filter.dateTo.isEmpty() && !isValidIsoDate(filter.dateTo))) {
-        m_lastError = QStringLiteral("Transaction filter dates must be valid ISO dates (YYYY-MM-DD)");
-        return false;
-    }
-    if (!filter.dateFrom.isEmpty() && !filter.dateTo.isEmpty() &&
-        filter.dateFrom > filter.dateTo) {
-        m_lastError = QStringLiteral("Transaction filter start date must not be after end date");
-        return false;
-    }
-    if (filter.categoryId < 0) {
-        m_lastError = QStringLiteral("Category filter ID cannot be negative");
-        return false;
-    }
-    if (filter.minimumAmount < 0 || filter.maximumAmount < 0 ||
-        (filter.maximumAmount != 0 && filter.minimumAmount > filter.maximumAmount)) {
-        m_lastError = QStringLiteral("Transaction amount filter range is invalid");
+    if (!validateFilter(filter, m_lastError)) {
         return false;
     }
 
-    QString sql =
-        QStringLiteral(
-            "SELECT ID_Transaction, ID_Account, ID_Category, Date, Amount, Type "
-            "FROM Transactions WHERE ID_Account = ?");
-    if (!filter.dateFrom.isEmpty()) {
-        sql += QStringLiteral(" AND Date >= ?");
-    }
-    if (!filter.dateTo.isEmpty()) {
-        sql += QStringLiteral(" AND Date <= ?");
-    }
-    if (filter.categoryId > 0) {
-        sql += QStringLiteral(" AND ID_Category = ?");
-    }
-    if (filter.minimumAmount > 0) {
-        sql += QStringLiteral(" AND Amount >= ?");
-    }
-    if (filter.maximumAmount > 0) {
-        sql += QStringLiteral(" AND Amount <= ?");
-    }
-    sql += QStringLiteral(" ORDER BY Date, ID_Transaction");
     QSqlQuery query(m_db);
-    query.prepare(sql);
+    query.prepare(
+        QStringLiteral("SELECT ") + QLatin1String(kTransactionColumns) +
+        QStringLiteral(" FROM Transactions WHERE ID_Account = ?") + filterClauses(filter) +
+        QStringLiteral(" ORDER BY Date, ID_Transaction"));
     query.addBindValue(accountId);
-    if (!filter.dateFrom.isEmpty()) {
-        query.addBindValue(filter.dateFrom);
-    }
-    if (!filter.dateTo.isEmpty()) {
-        query.addBindValue(filter.dateTo);
-    }
-    if (filter.categoryId > 0) {
-        query.addBindValue(filter.categoryId);
-    }
-    if (filter.minimumAmount > 0) {
-        query.addBindValue(filter.minimumAmount);
-    }
-    if (filter.maximumAmount > 0) {
-        query.addBindValue(filter.maximumAmount);
-    }
+    bindFilter(query, filter);
     if (!query.exec()) {
         setQueryError(m_lastError, QStringLiteral("Failed to retrieve transactions"), query);
         return false;
@@ -684,14 +754,325 @@ bool Database::getTransactions(
 
     QList<Transaction> result;
     while (query.next()) {
-        result.append(Transaction(
-            query.value(0).toInt(),
-            query.value(1).toInt(),
-            query.value(2).toInt(),
-            query.value(3).toString(),
-            query.value(4).toLongLong(),
-            query.value(5).toString() == QStringLiteral("in")));
+        result.append(transactionFromQuery(query));
     }
     transactions = result;
+    return true;
+}
+
+bool Database::getRecentTransactions(int accountId, int count, QList<Transaction> &transactions)
+{
+    m_lastError.clear();
+    if (!isOpen() || accountId <= 0 || count <= 0) {
+        m_lastError = isOpen() ? QStringLiteral("Invalid account or count")
+                               : QStringLiteral("Database is not open");
+        return false;
+    }
+    QSqlQuery query(m_db);
+    query.prepare(
+        QStringLiteral("SELECT ") + QLatin1String(kTransactionColumns) +
+        QStringLiteral(" FROM Transactions WHERE ID_Account = ? "
+                       "ORDER BY Date DESC, ID_Transaction DESC LIMIT ?"));
+    query.addBindValue(accountId);
+    query.addBindValue(count);
+    if (!query.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to retrieve transactions"), query);
+        return false;
+    }
+    QList<Transaction> result;
+    while (query.next()) {
+        result.append(transactionFromQuery(query));
+    }
+    transactions = result;
+    return true;
+}
+
+bool Database::getTotals(
+    int accountId,
+    qint64 &income,
+    qint64 &expenses,
+    const TransactionFilter &filter)
+{
+    m_lastError.clear();
+    if (!isOpen()) {
+        m_lastError = QStringLiteral("Database is not open");
+        return false;
+    }
+    if (accountId <= 0) {
+        m_lastError = QStringLiteral("Account ID must be positive");
+        return false;
+    }
+    if (!validateFilter(filter, m_lastError)) {
+        return false;
+    }
+    QSqlQuery query(m_db);
+    query.prepare(
+        QStringLiteral("SELECT Type, SUM(Amount) FROM Transactions WHERE ID_Account = ?") +
+        filterClauses(filter) + QStringLiteral(" GROUP BY Type"));
+    query.addBindValue(accountId);
+    bindFilter(query, filter);
+    if (!query.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to compute totals"), query);
+        return false;
+    }
+    income = 0;
+    expenses = 0;
+    while (query.next()) {
+        (query.value(0).toString() == QStringLiteral("in") ? income : expenses) =
+            query.value(1).toLongLong();
+    }
+    return true;
+}
+
+bool Database::getExpensesByCategory(
+    int accountId,
+    const TransactionFilter &filter,
+    QList<CategoryTotal> &totals)
+{
+    m_lastError.clear();
+    if (!isOpen() || accountId <= 0) {
+        m_lastError = isOpen() ? QStringLiteral("Account ID must be positive")
+                               : QStringLiteral("Database is not open");
+        return false;
+    }
+    if (!validateFilter(filter, m_lastError)) {
+        return false;
+    }
+    QSqlQuery query(m_db);
+    query.prepare(
+        QStringLiteral("SELECT ID_Category, SUM(Amount) FROM Transactions "
+                       "WHERE ID_Account = ? AND Type = 'out'") +
+        filterClauses(filter) +
+        QStringLiteral(" GROUP BY ID_Category ORDER BY SUM(Amount) DESC, ID_Category"));
+    query.addBindValue(accountId);
+    bindFilter(query, filter);
+    if (!query.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to compute category totals"), query);
+        return false;
+    }
+    QList<CategoryTotal> result;
+    while (query.next()) {
+        result.append({query.value(0).toInt(), query.value(1).toLongLong()});
+    }
+    totals = result;
+    return true;
+}
+
+bool Database::getMonthlyTotals(int accountId, const QString &fromDate, QList<MonthlyTotal> &totals)
+{
+    m_lastError.clear();
+    if (!isOpen() || accountId <= 0) {
+        m_lastError = isOpen() ? QStringLiteral("Account ID must be positive")
+                               : QStringLiteral("Database is not open");
+        return false;
+    }
+    if (!isValidIsoDate(fromDate)) {
+        m_lastError = QStringLiteral("Start date must be a valid ISO date (YYYY-MM-DD)");
+        return false;
+    }
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "SELECT substr(Date, 1, 7), Type, SUM(Amount) FROM Transactions "
+        "WHERE ID_Account = ? AND Date >= ? "
+        "GROUP BY substr(Date, 1, 7), Type ORDER BY substr(Date, 1, 7)"));
+    query.addBindValue(accountId);
+    query.addBindValue(fromDate);
+    if (!query.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to compute monthly totals"), query);
+        return false;
+    }
+    QList<MonthlyTotal> result;
+    QHash<QString, int> indexByMonth;
+    while (query.next()) {
+        const QString month = query.value(0).toString();
+        if (!indexByMonth.contains(month)) {
+            indexByMonth.insert(month, result.size());
+            result.append(MonthlyTotal{month, 0, 0});
+        }
+        MonthlyTotal &entry = result[indexByMonth.value(month)];
+        (query.value(1).toString() == QStringLiteral("in") ? entry.income : entry.expenses) =
+            query.value(2).toLongLong();
+    }
+    totals = result;
+    return true;
+}
+
+bool Database::getFirstAccountId(int &accountId)
+{
+    m_lastError.clear();
+    if (!isOpen()) {
+        m_lastError = QStringLiteral("Database is not open");
+        return false;
+    }
+    QSqlQuery query(m_db);
+    if (!query.exec(QStringLiteral("SELECT ID_Account FROM Bank_Account ORDER BY ID_Account LIMIT 1"))) {
+        setQueryError(m_lastError, QStringLiteral("Failed to read accounts"), query);
+        return false;
+    }
+    accountId = query.next() ? query.value(0).toInt() : 0;
+    return true;
+}
+
+bool Database::getAccountInitialCredit(int accountId, qint64 &initialCredit)
+{
+    m_lastError.clear();
+    if (!isOpen() || accountId <= 0) {
+        m_lastError = isOpen() ? QStringLiteral("Account ID must be positive")
+                               : QStringLiteral("Database is not open");
+        return false;
+    }
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("SELECT Initial_Credit FROM Bank_Account WHERE ID_Account = ?"));
+    query.addBindValue(accountId);
+    if (!query.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to read initial credit"), query);
+        return false;
+    }
+    if (!query.next()) {
+        m_lastError = QStringLiteral("Account %1 does not exist").arg(accountId);
+        return false;
+    }
+    initialCredit = query.value(0).toLongLong();
+    return true;
+}
+
+bool Database::setAccountInitialCredit(int accountId, qint64 initialCredit)
+{
+    m_lastError.clear();
+    if (!isOpen()) {
+        m_lastError = QStringLiteral("Database is not open");
+        return false;
+    }
+    if (accountId <= 0) {
+        m_lastError = QStringLiteral("Account ID must be positive");
+        return false;
+    }
+    if (initialCredit < 0) {
+        m_lastError = QStringLiteral("Initial credit cannot be negative");
+        return false;
+    }
+    if (!m_db.transaction()) {
+        m_lastError = QStringLiteral("Failed to start transaction: ") + m_db.lastError().text();
+        return false;
+    }
+    qint64 oldInitial = 0;
+    {
+        QSqlQuery select(m_db);
+        select.prepare(QStringLiteral("SELECT Initial_Credit FROM Bank_Account WHERE ID_Account = ?"));
+        select.addBindValue(accountId);
+        if (!select.exec()) {
+            setQueryError(m_lastError, QStringLiteral("Failed to read initial credit"), select);
+            return rollbackWithError(m_db, m_lastError);
+        }
+        if (!select.next()) {
+            m_lastError = QStringLiteral("Account %1 does not exist").arg(accountId);
+            return rollbackWithError(m_db, m_lastError);
+        }
+        oldInitial = select.value(0).toLongLong();
+    }
+    // Both values are >= 0, so the difference cannot overflow.
+    if (!adjustAccountBalance(m_db, accountId, initialCredit - oldInitial, m_lastError)) {
+        return rollbackWithError(m_db, m_lastError);
+    }
+    QSqlQuery update(m_db);
+    update.prepare(QStringLiteral("UPDATE Bank_Account SET Initial_Credit = ? WHERE ID_Account = ?"));
+    update.addBindValue(initialCredit);
+    update.addBindValue(accountId);
+    if (!update.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to update initial credit"), update);
+        return rollbackWithError(m_db, m_lastError);
+    }
+    if (!m_db.commit()) {
+        m_lastError = QStringLiteral("Failed to commit initial credit: ") + m_db.lastError().text();
+        return rollbackWithError(m_db, m_lastError);
+    }
+    return true;
+}
+
+bool Database::getCategoryUsage(int categoryId, int &transactionCount)
+{
+    m_lastError.clear();
+    if (!isOpen() || categoryId <= 0) {
+        m_lastError = isOpen() ? QStringLiteral("Category ID must be positive")
+                               : QStringLiteral("Database is not open");
+        return false;
+    }
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("SELECT COUNT(*) FROM Transactions WHERE ID_Category = ?"));
+    query.addBindValue(categoryId);
+    if (!query.exec() || !query.next()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to read category usage"), query);
+        return false;
+    }
+    transactionCount = query.value(0).toInt();
+    return true;
+}
+
+bool Database::updateCategory(int categoryId, const QString &name)
+{
+    m_lastError.clear();
+    if (!isOpen() || categoryId <= 0) {
+        m_lastError = isOpen() ? QStringLiteral("Category ID must be positive")
+                               : QStringLiteral("Database is not open");
+        return false;
+    }
+    const QString trimmed = name.trimmed();
+    if (trimmed.isEmpty()) {
+        m_lastError = QStringLiteral("Category name is required");
+        return false;
+    }
+    QSqlQuery select(m_db);
+    select.prepare(QStringLiteral("SELECT Type FROM Category WHERE ID_Category = ?"));
+    select.addBindValue(categoryId);
+    if (!select.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to read category"), select);
+        return false;
+    }
+    if (!select.next()) {
+        m_lastError = QStringLiteral("Category %1 does not exist").arg(categoryId);
+        return false;
+    }
+    const QString type = select.value(0).toString();
+    select.finish();
+    bool exists = false;
+    if (!categoryNameExists(m_db, trimmed, type, categoryId, exists, m_lastError)) {
+        return false;
+    }
+    if (exists) {
+        m_lastError = QStringLiteral("A category with this name already exists");
+        return false;
+    }
+    QSqlQuery update(m_db);
+    update.prepare(QStringLiteral("UPDATE Category SET Name = ? WHERE ID_Category = ?"));
+    update.addBindValue(trimmed);
+    update.addBindValue(categoryId);
+    if (!update.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to rename category"), update);
+        return false;
+    }
+    return true;
+}
+
+bool Database::deleteCategory(int categoryId)
+{
+    int usage = 0;
+    if (!getCategoryUsage(categoryId, usage)) {
+        return false;
+    }
+    if (usage > 0) {
+        m_lastError = QStringLiteral("Category is used by %1 transaction(s)").arg(usage);
+        return false;
+    }
+    QSqlQuery remove(m_db);
+    remove.prepare(QStringLiteral("DELETE FROM Category WHERE ID_Category = ?"));
+    remove.addBindValue(categoryId);
+    if (!remove.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to delete category"), remove);
+        return false;
+    }
+    if (remove.numRowsAffected() != 1) {
+        m_lastError = QStringLiteral("Category %1 does not exist").arg(categoryId);
+        return false;
+    }
     return true;
 }

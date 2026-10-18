@@ -263,11 +263,11 @@ int main(int argc, char *argv[])
     const QByteArray csvContents = csvFile.readAll();
     if (!expect(
             csvContents.startsWith(
-                QByteArrayLiteral("transaction_id,account_id,category_id,date,type,amount_cents\r\n")),
+                QByteArrayLiteral("transaction_id,account_id,category_id,date,type,amount_cents,note\r\n")),
             QStringLiteral("CSV header is incorrect")) ||
         !expect(csvContents.count('\n') == 2, QStringLiteral("CSV export contains unexpected rows")) ||
         !expect(
-            csvContents.contains(QByteArrayLiteral(",expense,1500\r\n")),
+            csvContents.contains(QByteArrayLiteral(",expense,1500,\r\n")),
             QStringLiteral("CSV row is incorrect"))) {
         return 1;
     }
