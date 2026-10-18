@@ -51,7 +51,6 @@ private:
     QLabel *m_balanceValue = nullptr;
     QLabel *m_incomeValue = nullptr;
     QLabel *m_expensesValue = nullptr;
-    QLabel *m_monthValue = nullptr;
     DonutChart *m_donut = nullptr;
     MonthlyBarChart *m_bars = nullptr;
     QTableWidget *m_recentTable = nullptr;
