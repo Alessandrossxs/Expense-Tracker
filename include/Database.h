@@ -6,6 +6,7 @@
 #include <QVariant>
 
 #include "Statistics.h"
+#include "Recurring.h"
 #include "Transfer.h"
 
 class Transaction;
@@ -91,6 +92,14 @@ public:
         int accountId,
         QList<Transfer> &transfers,
         const TransactionFilter &filter = TransactionFilter{});
+    // Entrate e uscite ricorrenti
+    bool addRecurring(const RecurringRule &rule, int *newId = nullptr);
+    bool updateRecurring(const RecurringRule &rule); // re-anchors the schedule at rule.startDate
+    bool deleteRecurring(int recurringId);
+    bool setRecurringActive(int recurringId, bool active, const QString &today);
+    bool getRecurring(int accountId, QList<RecurringRule> &rules);
+    // Creates every transaction that is due up to `today` (catch-up included).
+    bool processRecurring(const QString &today, int &created);
     bool getRecentTransactions(int accountId, int count, QList<Transaction> &transactions);
 
     // Aggregati calcolati in SQL

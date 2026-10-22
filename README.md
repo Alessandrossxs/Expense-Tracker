@@ -4,10 +4,11 @@ A C++ application for managing personal income and expenses, tracking financial 
 
 ## Features
 
-- Qt desktop interface with five pages: **Panoramica**, **Transazioni**, **Categorie**, **Conti**, and **Aspetto**
+- Qt desktop interface with six pages: **Panoramica**, **Transazioni**, **Categorie**, **Ricorrenti**, **Conti**, and **Aspetto**
 - Dashboard with current balance, total income, total expenses, this month's expenses, a spending-by-category chart, a 6-month income/expense chart, and the latest transactions
 - Multiple accounts, switchable from the sidebar; create, rename, delete (empty accounts only) and set each account's initial balance
 - Transfers between accounts, kept apart from income and expenses so they never count as earnings or spending
+- Recurring incomes and expenses (daily, weekly, monthly, yearly, every N periods, optional end date): due transactions are created automatically, including those missed while the app was closed; rules can be paused, edited and deleted
 - Add, edit, and delete transactions, each with an optional note
 - Sortable transaction table (click a column header) with a totals line for the filtered list
 - Filter by period (all, this month, last 30 days, this year, custom range), category, and amount range; filters apply instantly

@@ -3,6 +3,7 @@
 #include "ChartWidgets.h"
 #include "Format.h"
 #include "Popup.h"
+#include "RecurringForm.h"
 #include "Theme.h"
 #include "TransactionForm.h"
 
@@ -269,6 +270,13 @@ MainWindow::MainWindow(const QString &databasePath, QWidget *parent)
                   [this] { if (!Popup::isOpen()) editTransaction(); }, Qt::WidgetShortcut);
 
     refreshAll();
+
+    // Creates the recurring transactions that became due (also while the app was closed).
+    m_recurringTimer = new QTimer(this);
+    m_recurringTimer->setInterval(30 * 60 * 1000);
+    connect(m_recurringTimer, &QTimer::timeout, this, [this] { if (!Popup::isOpen()) processRecurring(); });
+    m_recurringTimer->start();
+    QTimer::singleShot(300, this, [this] { processRecurring(); });
 }
 
 bool MainWindow::initializeData()
@@ -400,7 +408,7 @@ void MainWindow::buildUi()
     m_pages = new QStackedWidget(root);
     auto *group = new QButtonGroup(this);
     group->setExclusive(true);
-    const QStringList navLabels = {tr("Panoramica"), tr("Transazioni"), tr("Categorie"), tr("Conti"), tr("Aspetto")};
+    const QStringList navLabels = {tr("Panoramica"), tr("Transazioni"), tr("Categorie"), tr("Ricorrenti"), tr("Conti"), tr("Aspetto")};
     for (int i = 0; i < navLabels.size(); ++i) {
         auto *b = button(navLabels[i], "navButton", sidebar);
         b->setCheckable(true);
@@ -418,6 +426,7 @@ void MainWindow::buildUi()
     m_pages->addWidget(buildDashboardPage());
     m_pages->addWidget(buildTransactionsPage());
     m_pages->addWidget(buildCategoriesPage());
+    m_pages->addWidget(buildRecurringPage());
     m_pages->addWidget(buildAccountsPage());
     m_pages->addWidget(buildAppearancePage());
     rootLayout->addWidget(sidebar);
@@ -444,7 +453,8 @@ void MainWindow::showPage(int index)
         m_navButtons.at(index)->setChecked(true);
     if (index == 1) refreshTransactions();
     if (index == 2) refreshCategories();
-    if (index == 3) refreshAccounts();
+    if (index == 3) refreshRecurring();
+    if (index == 4) refreshAccounts();
 }
 
 void MainWindow::showToast(const QString &text)
@@ -921,6 +931,7 @@ void MainWindow::refreshAll()
     refreshDashboard();
     refreshTransactions();
     refreshCategories();
+    refreshRecurring();
 }
 
 void MainWindow::refreshAccounts()
@@ -1346,7 +1357,7 @@ void MainWindow::deleteCategory()
     }
     if (usage > 0) {
         Popup::message(this, tr("Categoria in uso"),
-                       tr("La categoria «%1» è usata da %2 transazioni e non può essere eliminata.\n"
+                       tr("La categoria «%1» è usata da %2 movimenti o ricorrenze e non può essere eliminata.\n"
                           "Modifica o elimina prima quelle transazioni.").arg(name).arg(usage));
         return;
     }
@@ -1415,13 +1426,15 @@ void MainWindow::deleteAccount()
     }
     QList<Transaction> any;
     QList<Transfer> transfers;
-    if (!m_manager.getRecentTransactions(id, 1, any) || !m_manager.getTransfers(id, transfers)) {
+    QList<RecurringRule> rules;
+    if (!m_manager.getRecentTransactions(id, 1, any) || !m_manager.getTransfers(id, transfers) ||
+        !m_manager.getRecurring(id, rules)) {
         showError(m_manager.lastError());
         return;
     }
-    if (!any.isEmpty() || !transfers.isEmpty()) {
+    if (!any.isEmpty() || !transfers.isEmpty() || !rules.isEmpty()) {
         Popup::message(this, tr("Conto con movimenti"),
-                       tr("Il conto «%1» contiene transazioni o trasferimenti e non può essere eliminato.").arg(name));
+                       tr("Il conto «%1» contiene transazioni, trasferimenti o ricorrenze e non può essere eliminato.").arg(name));
         return;
     }
     if (!Popup::confirm(this, tr("Conferma eliminazione"), tr("Vuoi eliminare il conto «%1»?").arg(name),
@@ -1504,4 +1517,199 @@ void MainWindow::addTransfer()
     }
     refreshAll();
     showToast(tr("Trasferimento eseguito"));
+}
+
+namespace
+{
+QString frequencyText(const RecurringRule &r)
+{
+    const int n = r.interval;
+    if (r.frequency == QLatin1String("daily"))
+        return n == 1 ? QObject::tr("Ogni giorno") : QObject::tr("Ogni %1 giorni").arg(n);
+    if (r.frequency == QLatin1String("weekly"))
+        return n == 1 ? QObject::tr("Ogni settimana") : QObject::tr("Ogni %1 settimane").arg(n);
+    if (r.frequency == QLatin1String("monthly"))
+        return n == 1 ? QObject::tr("Ogni mese") : QObject::tr("Ogni %1 mesi").arg(n);
+    return n == 1 ? QObject::tr("Ogni anno") : QObject::tr("Ogni %1 anni").arg(n);
+}
+
+bool ruleFinished(const RecurringRule &r)
+{
+    return !r.endDate.isEmpty() && r.nextDate > r.endDate;
+}
+}
+
+QWidget *MainWindow::buildRecurringPage()
+{
+    auto *page = new QWidget;
+    auto *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(30, 28, 30, 26);
+    layout->setSpacing(16);
+    layout->addWidget(pageTitle(tr("Ricorrenti"), page));
+    layout->addWidget(subTitle(tr("Entrate e uscite che si ripetono, come affitto, abbonamenti o stipendio: "
+                                  "le transazioni vengono create da sole alla data prevista."), page));
+
+    m_recurringTable = makeTable({tr("Descrizione"), tr("Categoria"), tr("Importo"), tr("Frequenza"),
+                                  tr("Prossima"), tr("Stato")}, page);
+    QLabel *empty = nullptr;
+    m_recurringStack = withEmptyState(m_recurringTable, &empty, page);
+    empty->setText(tr("Nessuna ricorrenza su questo conto.\nPremi «+ Nuova ricorrenza» per crearne una."));
+    layout->addWidget(m_recurringStack, 1);
+
+    auto *actions = new QHBoxLayout;
+    auto *add = button(tr("+ Nuova ricorrenza"), "primaryButton", page);
+    auto *edit = button(tr("Modifica"), "secondaryButton", page, tr("Doppio clic sulla riga"));
+    auto *toggle = button(tr("Pausa / Riprendi"), "secondaryButton", page,
+                          tr("Le esecuzioni saltate durante la pausa non vengono create"));
+    auto *remove = button(tr("Elimina"), "secondaryButton", page,
+                          tr("Le transazioni già create restano nel conto"));
+    actions->addWidget(add);
+    actions->addWidget(edit);
+    actions->addWidget(toggle);
+    actions->addWidget(remove);
+    actions->addStretch();
+    layout->addLayout(actions);
+    connect(add, &QPushButton::clicked, this, &MainWindow::addRecurring);
+    connect(edit, &QPushButton::clicked, this, &MainWindow::editRecurring);
+    connect(toggle, &QPushButton::clicked, this, &MainWindow::toggleRecurring);
+    connect(remove, &QPushButton::clicked, this, &MainWindow::deleteRecurring);
+    connect(m_recurringTable, &QTableWidget::cellDoubleClicked, this, [this] { editRecurring(); });
+    return page;
+}
+
+void MainWindow::refreshRecurring()
+{
+    if (!m_recurringTable)
+        return;
+    if (!m_manager.getRecurring(m_accountId, m_rules)) {
+        showError(m_manager.lastError());
+        return;
+    }
+    m_recurringTable->setRowCount(m_rules.size());
+    for (int row = 0; row < m_rules.size(); ++row) {
+        const RecurringRule &r = m_rules.at(row);
+        const bool finished = ruleFinished(r);
+        auto *name = cell(r.note.isEmpty() ? categoryName(r.categoryId) : r.note);
+        name->setData(Qt::UserRole, r.id);
+        m_recurringTable->setItem(row, 0, name);
+        m_recurringTable->setItem(row, 1, cell(categoryName(r.categoryId)));
+        auto *amount = cell((r.isIncome ? QStringLiteral("+") : QStringLiteral("−")) + formatMoney(r.amount),
+                            Qt::AlignVCenter | Qt::AlignRight);
+        amount->setForeground(QColor(r.isIncome ? QStringLiteral("#16845b") : QStringLiteral("#d94d64")));
+        m_recurringTable->setItem(row, 2, amount);
+        m_recurringTable->setItem(row, 3, cell(frequencyText(r)));
+        m_recurringTable->setItem(row, 4, cell(finished ? QStringLiteral("—")
+            : QDate::fromString(r.nextDate, Qt::ISODate).toString(QStringLiteral("dd/MM/yyyy"))));
+        m_recurringTable->setItem(row, 5, cell(!r.active ? tr("In pausa") : finished ? tr("Conclusa") : tr("Attiva")));
+    }
+    m_recurringStack->setCurrentIndex(m_rules.isEmpty() ? 1 : 0);
+}
+
+int MainWindow::selectedRecurringId() const
+{
+    const int row = m_recurringTable ? m_recurringTable->currentRow() : -1;
+    return (row < 0 || !m_recurringTable->item(row, 0)) ? 0 : m_recurringTable->item(row, 0)->data(Qt::UserRole).toInt();
+}
+
+int MainWindow::processRecurring(bool announce)
+{
+    int created = 0;
+    if (!m_manager.processRecurring(QDate::currentDate().toString(Qt::ISODate), created)) {
+        showError(tr("Impossibile creare le transazioni ricorrenti: %1").arg(m_manager.lastError()));
+        return 0;
+    }
+    if (created > 0 && announce) {
+        refreshAll();
+        showToast(created == 1 ? tr("1 transazione ricorrente creata")
+                               : tr("%1 transazioni ricorrenti create").arg(created));
+    }
+    return created;
+}
+
+void MainWindow::addRecurring()
+{
+    if (Popup::isOpen())
+        return;
+    auto *form = new RecurringForm(m_categories, m_accountId, false);
+    if (!Popup::run(this, tr("Nuova ricorrenza"), form, tr("Salva"), [form] { return form->validate(); }))
+        return;
+    if (!m_manager.addRecurring(form->rule())) {
+        showError(tr("Impossibile salvare la ricorrenza: %1").arg(m_manager.lastError()));
+        return;
+    }
+    const int created = processRecurring(false); // back-dated start: create the missed ones now
+    refreshAll();
+    showToast(created > 0 ? tr("Ricorrenza creata · %1 transazioni aggiunte").arg(created)
+                          : tr("Ricorrenza creata"));
+}
+
+void MainWindow::editRecurring()
+{
+    const int id = selectedRecurringId();
+    if (id == 0) {
+        Popup::message(this, tr("Seleziona una ricorrenza"), tr("Seleziona una riga da modificare."));
+        return;
+    }
+    const auto it = std::find_if(m_rules.cbegin(), m_rules.cend(),
+                                 [id](const RecurringRule &r) { return r.id == id; });
+    if (it == m_rules.cend())
+        return;
+    auto *form = new RecurringForm(m_categories, m_accountId, true);
+    form->setRule(*it);
+    if (!Popup::run(this, tr("Modifica ricorrenza"), form, tr("Salva"), [form] { return form->validate(); }))
+        return;
+    RecurringRule rule = form->rule();
+    rule.id = id;
+    rule.accountId = m_accountId;
+    if (!m_manager.updateRecurring(rule)) {
+        showError(tr("Impossibile modificare la ricorrenza: %1").arg(m_manager.lastError()));
+        return;
+    }
+    const int created = processRecurring(false);
+    refreshAll();
+    showToast(created > 0 ? tr("Ricorrenza aggiornata · %1 transazioni aggiunte").arg(created)
+                          : tr("Ricorrenza aggiornata"));
+}
+
+void MainWindow::toggleRecurring()
+{
+    const int id = selectedRecurringId();
+    if (id == 0) {
+        Popup::message(this, tr("Seleziona una ricorrenza"), tr("Seleziona prima una riga dalla tabella."));
+        return;
+    }
+    const auto it = std::find_if(m_rules.cbegin(), m_rules.cend(),
+                                 [id](const RecurringRule &r) { return r.id == id; });
+    if (it == m_rules.cend())
+        return;
+    const bool activate = !it->active;
+    if (!m_manager.setRecurringActive(id, activate, QDate::currentDate().toString(Qt::ISODate))) {
+        showError(tr("Impossibile aggiornare la ricorrenza: %1").arg(m_manager.lastError()));
+        return;
+    }
+    refreshAll();
+    showToast(activate ? tr("Ricorrenza ripresa") : tr("Ricorrenza messa in pausa"));
+}
+
+void MainWindow::deleteRecurring()
+{
+    const int id = selectedRecurringId();
+    if (id == 0) {
+        Popup::message(this, tr("Seleziona una ricorrenza"), tr("Seleziona una riga da eliminare."));
+        return;
+    }
+    const auto it = std::find_if(m_rules.cbegin(), m_rules.cend(),
+                                 [id](const RecurringRule &r) { return r.id == id; });
+    const QString name = it == m_rules.cend() ? QString()
+        : (it->note.isEmpty() ? categoryName(it->categoryId) : it->note);
+    if (!Popup::confirm(this, tr("Conferma eliminazione"),
+                        tr("Vuoi eliminare la ricorrenza «%1»?\nLe transazioni già create restano nel conto.").arg(name),
+                        tr("Elimina"), true))
+        return;
+    if (!m_manager.deleteRecurring(id)) {
+        showError(tr("Impossibile eliminare la ricorrenza: %1").arg(m_manager.lastError()));
+        return;
+    }
+    refreshAll();
+    showToast(tr("Ricorrenza eliminata"));
 }

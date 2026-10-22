@@ -172,6 +172,36 @@ bool ExpenseManager::getTransfers(int accountId, QList<Transfer> &transfers, con
     return recordResult(m_database.getTransfers(accountId, transfers, filter));
 }
 
+bool ExpenseManager::addRecurring(const RecurringRule &rule, int *newId)
+{
+    return recordResult(m_database.addRecurring(rule, newId));
+}
+
+bool ExpenseManager::updateRecurring(const RecurringRule &rule)
+{
+    return recordResult(m_database.updateRecurring(rule));
+}
+
+bool ExpenseManager::deleteRecurring(int recurringId)
+{
+    return recordResult(m_database.deleteRecurring(recurringId));
+}
+
+bool ExpenseManager::setRecurringActive(int recurringId, bool active, const QString &today)
+{
+    return recordResult(m_database.setRecurringActive(recurringId, active, today));
+}
+
+bool ExpenseManager::getRecurring(int accountId, QList<RecurringRule> &rules)
+{
+    return recordResult(m_database.getRecurring(accountId, rules));
+}
+
+bool ExpenseManager::processRecurring(const QString &today, int &created)
+{
+    return recordResult(m_database.processRecurring(today, created));
+}
+
 bool ExpenseManager::getStatistics(
     int accountId,
     Statistics &statistics,

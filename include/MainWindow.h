@@ -72,6 +72,10 @@ private:
     QTableWidget *m_categoriesTable = nullptr;
     QTableWidget *m_accountsTable = nullptr;
     QLabel *m_totalValue = nullptr;
+    QTableWidget *m_recurringTable = nullptr;
+    QStackedWidget *m_recurringStack = nullptr;
+    QTimer *m_recurringTimer = nullptr;
+    QList<RecurringRule> m_rules;
     QList<QPushButton *> m_swatches;
     QPushButton *m_lightButton = nullptr;
     QPushButton *m_darkButton = nullptr;
@@ -83,6 +87,7 @@ private:
     QWidget *buildDashboardPage();
     QWidget *buildTransactionsPage();
     QWidget *buildCategoriesPage();
+    QWidget *buildRecurringPage();
     QWidget *buildAccountsPage();
     QWidget *buildAppearancePage();
     void applyTheme();
@@ -98,6 +103,7 @@ private:
     void refreshDashboard();
     void refreshTransactions();
     void refreshCategories();
+    void refreshRecurring();
     void fillTransactionRow(QTableWidget *table, int row, const Transaction &t) const;
     void fillTransferRow(QTableWidget *table, int row, const Transfer &t) const;
     TransactionFilter currentFilter() const;
@@ -108,6 +114,7 @@ private:
     RowRef selectedTransactionRow() const;
     int selectedCategoryId() const;
     int selectedAccountId() const;
+    int selectedRecurringId() const;
     bool categoryNameTaken(const QString &name, const QString &type, int excludeId) const;
 
     void addTransaction();
@@ -122,5 +129,10 @@ private:
     void deleteAccount();
     void setInitialBalance(int accountId);
     void addTransfer();
+    void addRecurring();
+    void editRecurring();
+    void toggleRecurring();
+    void deleteRecurring();
+    int processRecurring(bool announce = true);
     void switchAccount(int accountId);
 };

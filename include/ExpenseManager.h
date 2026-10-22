@@ -36,6 +36,12 @@ public:
     bool addTransfer(int fromAccountId, int toAccountId, qint64 amount, const QString &date,
                      const QString &note, int *newId = nullptr);
     bool deleteTransfer(int transferId);
+    bool addRecurring(const RecurringRule &rule, int *newId = nullptr);
+    bool updateRecurring(const RecurringRule &rule);
+    bool deleteRecurring(int recurringId);
+    bool setRecurringActive(int recurringId, bool active, const QString &today);
+    bool getRecurring(int accountId, QList<RecurringRule> &rules);
+    bool processRecurring(const QString &today, int &created);
     bool getTransfers(int accountId, QList<Transfer> &transfers,
                       const TransactionFilter &filter = TransactionFilter{});
     bool getAccountInitialCredit(int accountId, qint64 &initialCredit);

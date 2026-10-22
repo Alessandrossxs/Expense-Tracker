@@ -213,6 +213,72 @@ bool categoryNameExists(
     exists = query.value(0).toInt() > 0;
     return true;
 }
+
+// n-th occurrence of a schedule, always computed from the start date so that
+// month-end dates do not drift (Jan 31 -> Feb 28 -> Mar 31).
+QDate occurrenceDate(const QDate &start, const QString &frequency, int interval, qint64 n)
+{
+    const qint64 steps = n * interval;
+    if (frequency == QLatin1String("daily")) return start.addDays(steps);
+    if (frequency == QLatin1String("weekly")) return start.addDays(steps * 7);
+    if (frequency == QLatin1String("monthly")) return start.addMonths(static_cast<int>(steps));
+    return start.addYears(static_cast<int>(steps));
+}
+
+bool isValidRule(const RecurringRule &rule, QString &lastError)
+{
+    const QStringList frequencies = {QStringLiteral("daily"), QStringLiteral("weekly"),
+                                     QStringLiteral("monthly"), QStringLiteral("yearly")};
+    if (rule.accountId <= 0) {
+        lastError = QStringLiteral("Account ID must be positive");
+    } else if (rule.categoryId <= 0) {
+        lastError = QStringLiteral("Category ID must be positive");
+    } else if (rule.amount <= 0) {
+        lastError = QStringLiteral("Recurring amount must be positive");
+    } else if (!frequencies.contains(rule.frequency)) {
+        lastError = QStringLiteral("Recurring frequency is invalid");
+    } else if (rule.interval < 1 || rule.interval > 999) {
+        lastError = QStringLiteral("Recurring interval must be between 1 and 999");
+    } else if (!isValidIsoDate(rule.startDate)) {
+        lastError = QStringLiteral("Recurring start date must be a valid ISO date (YYYY-MM-DD)");
+    } else if (!rule.endDate.isEmpty() && (!isValidIsoDate(rule.endDate) || rule.endDate < rule.startDate)) {
+        lastError = QStringLiteral("Recurring end date must be a valid date not before the start date");
+    } else if (rule.note.trimmed().size() > 500) {
+        lastError = QStringLiteral("Recurring note cannot exceed 500 characters");
+    } else {
+        return true;
+    }
+    return false;
+}
+
+const char *kRecurringColumns =
+    "ID_Recurring, ID_Account, ID_Category, Amount, Type, Note, Frequency, Interval_Count, "
+    "Start_Date, Next_Date, End_Date, Generated, Active";
+
+RecurringRule ruleFromQuery(const QSqlQuery &q)
+{
+    RecurringRule r;
+    r.id = q.value(0).toInt();
+    r.accountId = q.value(1).toInt();
+    r.categoryId = q.value(2).toInt();
+    r.amount = q.value(3).toLongLong();
+    r.isIncome = q.value(4).toString() == QStringLiteral("in");
+    r.note = q.value(5).toString();
+    r.frequency = q.value(6).toString();
+    r.interval = q.value(7).toInt();
+    r.startDate = q.value(8).toString();
+    r.nextDate = q.value(9).toString();
+    r.endDate = q.value(10).toString();
+    r.generated = q.value(11).toInt();
+    r.active = q.value(12).toInt() != 0;
+    return r;
+}
+
+QString storedNote(const QString &note)
+{
+    const QString trimmed = note.trimmed();
+    return trimmed.isNull() ? QString(QLatin1String("")) : trimmed;
+}
 }
 
 Database::Database(const QString &databasePath)
@@ -317,6 +383,28 @@ bool Database::initialize()
             "ON UPDATE RESTRICT ON DELETE RESTRICT, "
             "FOREIGN KEY (ID_To) REFERENCES Bank_Account(ID_Account) "
             "ON UPDATE RESTRICT ON DELETE RESTRICT)"),
+        QStringLiteral(
+            "CREATE TABLE IF NOT EXISTS Recurring ("
+            "ID_Recurring INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "ID_Account INTEGER NOT NULL, "
+            "ID_Category INTEGER NOT NULL, "
+            "Amount INTEGER NOT NULL CHECK (Amount > 0), "
+            "Type TEXT NOT NULL CHECK (Type IN ('in', 'out')), "
+            "Note TEXT NOT NULL DEFAULT '', "
+            "Frequency TEXT NOT NULL CHECK (Frequency IN ('daily', 'weekly', 'monthly', 'yearly')), "
+            "Interval_Count INTEGER NOT NULL CHECK (Interval_Count >= 1), "
+            "Start_Date TEXT NOT NULL, "
+            "Next_Date TEXT NOT NULL, "
+            "End_Date TEXT NOT NULL DEFAULT '', "
+            "Generated INTEGER NOT NULL DEFAULT 0, "
+            "Active INTEGER NOT NULL DEFAULT 1 CHECK (Active IN (0, 1)), "
+            "FOREIGN KEY (ID_Account) REFERENCES Bank_Account(ID_Account) "
+            "ON UPDATE RESTRICT ON DELETE RESTRICT, "
+            "FOREIGN KEY (ID_Category) REFERENCES Category(ID_Category) "
+            "ON UPDATE RESTRICT ON DELETE RESTRICT)"),
+        QStringLiteral(
+            "CREATE INDEX IF NOT EXISTS idx_recurring_due "
+            "ON Recurring(Active, Next_Date)"),
         QStringLiteral(
             "CREATE INDEX IF NOT EXISTS idx_transfers_dates "
             "ON Transfers(Date, ID_Transfer)"),
@@ -1014,7 +1102,10 @@ bool Database::getCategoryUsage(int categoryId, int &transactionCount)
         return false;
     }
     QSqlQuery query(m_db);
-    query.prepare(QStringLiteral("SELECT COUNT(*) FROM Transactions WHERE ID_Category = ?"));
+    query.prepare(QStringLiteral(
+        "SELECT (SELECT COUNT(*) FROM Transactions WHERE ID_Category = ?) + "
+        "(SELECT COUNT(*) FROM Recurring WHERE ID_Category = ?)"));
+    query.addBindValue(categoryId);
     query.addBindValue(categoryId);
     if (!query.exec() || !query.next()) {
         setQueryError(m_lastError, QStringLiteral("Failed to read category usage"), query);
@@ -1159,7 +1250,9 @@ bool Database::deleteAccount(int accountId)
     count.prepare(QStringLiteral(
         "SELECT (SELECT COUNT(*) FROM Bank_Account), "
         "(SELECT COUNT(*) FROM Transactions WHERE ID_Account = ?), "
-        "(SELECT COUNT(*) FROM Transfers WHERE ID_From = ? OR ID_To = ?)"));
+        "(SELECT COUNT(*) FROM Transfers WHERE ID_From = ? OR ID_To = ?) + "
+        "(SELECT COUNT(*) FROM Recurring WHERE ID_Account = ?)"));
+    count.addBindValue(accountId);
     count.addBindValue(accountId);
     count.addBindValue(accountId);
     count.addBindValue(accountId);
@@ -1172,7 +1265,7 @@ bool Database::deleteAccount(int accountId)
         return false;
     }
     if (count.value(1).toInt() > 0 || count.value(2).toInt() > 0) {
-        m_lastError = QStringLiteral("Only accounts without transactions or transfers can be deleted");
+        m_lastError = QStringLiteral("Only accounts without transactions, transfers or recurring rules can be deleted");
         return false;
     }
     QSqlQuery remove(m_db);
@@ -1340,5 +1433,267 @@ bool Database::getTransfers(int accountId, QList<Transfer> &transfers, const Tra
         result.append(t);
     }
     transfers = result;
+    return true;
+}
+
+bool Database::addRecurring(const RecurringRule &rule, int *newId)
+{
+    m_lastError.clear();
+    if (!isOpen()) {
+        m_lastError = QStringLiteral("Database is not open");
+        return false;
+    }
+    if (!isValidRule(rule, m_lastError) ||
+        !categoryMatchesType(m_db, rule.categoryId, transactionType(rule.isIncome), m_lastError)) {
+        return false;
+    }
+    QSqlQuery insert(m_db);
+    insert.prepare(QStringLiteral(
+        "INSERT INTO Recurring (ID_Account, ID_Category, Amount, Type, Note, Frequency, Interval_Count, "
+        "Start_Date, Next_Date, End_Date, Generated, Active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)"));
+    insert.addBindValue(rule.accountId);
+    insert.addBindValue(rule.categoryId);
+    insert.addBindValue(rule.amount);
+    insert.addBindValue(transactionType(rule.isIncome));
+    insert.addBindValue(storedNote(rule.note));
+    insert.addBindValue(rule.frequency);
+    insert.addBindValue(rule.interval);
+    insert.addBindValue(rule.startDate);
+    insert.addBindValue(rule.startDate);
+    insert.addBindValue(rule.endDate.isNull() ? QString(QLatin1String("")) : rule.endDate);
+    if (!insert.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to create recurring rule"), insert);
+        return false;
+    }
+    if (newId) *newId = insert.lastInsertId().toInt();
+    return true;
+}
+
+bool Database::updateRecurring(const RecurringRule &rule)
+{
+    m_lastError.clear();
+    if (!isOpen()) {
+        m_lastError = QStringLiteral("Database is not open");
+        return false;
+    }
+    if (rule.id <= 0) {
+        m_lastError = QStringLiteral("Recurring rule ID must be positive");
+        return false;
+    }
+    if (!isValidRule(rule, m_lastError) ||
+        !categoryMatchesType(m_db, rule.categoryId, transactionType(rule.isIncome), m_lastError)) {
+        return false;
+    }
+    QSqlQuery update(m_db);
+    update.prepare(QStringLiteral(
+        "UPDATE Recurring SET ID_Category = ?, Amount = ?, Type = ?, Note = ?, Frequency = ?, "
+        "Interval_Count = ?, Start_Date = ?, Next_Date = ?, End_Date = ?, Generated = 0 "
+        "WHERE ID_Recurring = ?"));
+    update.addBindValue(rule.categoryId);
+    update.addBindValue(rule.amount);
+    update.addBindValue(transactionType(rule.isIncome));
+    update.addBindValue(storedNote(rule.note));
+    update.addBindValue(rule.frequency);
+    update.addBindValue(rule.interval);
+    update.addBindValue(rule.startDate);
+    update.addBindValue(rule.startDate);
+    update.addBindValue(rule.endDate.isNull() ? QString(QLatin1String("")) : rule.endDate);
+    update.addBindValue(rule.id);
+    if (!update.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to update recurring rule"), update);
+        return false;
+    }
+    if (update.numRowsAffected() != 1) {
+        m_lastError = QStringLiteral("Recurring rule %1 does not exist").arg(rule.id);
+        return false;
+    }
+    return true;
+}
+
+bool Database::deleteRecurring(int recurringId)
+{
+    m_lastError.clear();
+    if (!isOpen() || recurringId <= 0) {
+        m_lastError = isOpen() ? QStringLiteral("Recurring rule ID must be positive")
+                               : QStringLiteral("Database is not open");
+        return false;
+    }
+    QSqlQuery remove(m_db);
+    remove.prepare(QStringLiteral("DELETE FROM Recurring WHERE ID_Recurring = ?"));
+    remove.addBindValue(recurringId);
+    if (!remove.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to delete recurring rule"), remove);
+        return false;
+    }
+    if (remove.numRowsAffected() != 1) {
+        m_lastError = QStringLiteral("Recurring rule %1 does not exist").arg(recurringId);
+        return false;
+    }
+    return true;
+}
+
+bool Database::setRecurringActive(int recurringId, bool active, const QString &today)
+{
+    m_lastError.clear();
+    if (!isOpen() || recurringId <= 0) {
+        m_lastError = isOpen() ? QStringLiteral("Recurring rule ID must be positive")
+                               : QStringLiteral("Database is not open");
+        return false;
+    }
+    int generated = -1;
+    QString nextDate;
+    if (active) {
+        // Occurrences that fell during the pause are skipped, not created retroactively.
+        if (!isValidIsoDate(today)) {
+            m_lastError = QStringLiteral("Date must be a valid ISO date (YYYY-MM-DD)");
+            return false;
+        }
+        QSqlQuery select(m_db);
+        select.prepare(QStringLiteral("SELECT ") + QLatin1String(kRecurringColumns) +
+                       QStringLiteral(" FROM Recurring WHERE ID_Recurring = ?"));
+        select.addBindValue(recurringId);
+        if (!select.exec()) {
+            setQueryError(m_lastError, QStringLiteral("Failed to read recurring rule"), select);
+            return false;
+        }
+        if (!select.next()) {
+            m_lastError = QStringLiteral("Recurring rule %1 does not exist").arg(recurringId);
+            return false;
+        }
+        const RecurringRule rule = ruleFromQuery(select);
+        const QDate start = QDate::fromString(rule.startDate, Qt::ISODate);
+        const QDate now = QDate::fromString(today, Qt::ISODate);
+        qint64 n = rule.generated;
+        QDate next = occurrenceDate(start, rule.frequency, rule.interval, n);
+        while (next < now && n < rule.generated + 200000) {
+            next = occurrenceDate(start, rule.frequency, rule.interval, ++n);
+        }
+        generated = static_cast<int>(n);
+        nextDate = next.toString(Qt::ISODate);
+    }
+    QSqlQuery update(m_db);
+    if (active) {
+        update.prepare(QStringLiteral(
+            "UPDATE Recurring SET Active = 1, Generated = ?, Next_Date = ? WHERE ID_Recurring = ?"));
+        update.addBindValue(generated);
+        update.addBindValue(nextDate);
+    } else {
+        update.prepare(QStringLiteral("UPDATE Recurring SET Active = 0 WHERE ID_Recurring = ?"));
+    }
+    update.addBindValue(recurringId);
+    if (!update.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to update recurring rule"), update);
+        return false;
+    }
+    if (update.numRowsAffected() != 1) {
+        m_lastError = QStringLiteral("Recurring rule %1 does not exist").arg(recurringId);
+        return false;
+    }
+    return true;
+}
+
+bool Database::getRecurring(int accountId, QList<RecurringRule> &rules)
+{
+    m_lastError.clear();
+    if (!isOpen() || accountId <= 0) {
+        m_lastError = isOpen() ? QStringLiteral("Account ID must be positive")
+                               : QStringLiteral("Database is not open");
+        return false;
+    }
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("SELECT ") + QLatin1String(kRecurringColumns) +
+                  QStringLiteral(" FROM Recurring WHERE ID_Account = ? "
+                                 "ORDER BY Active DESC, Next_Date, ID_Recurring"));
+    query.addBindValue(accountId);
+    if (!query.exec()) {
+        setQueryError(m_lastError, QStringLiteral("Failed to read recurring rules"), query);
+        return false;
+    }
+    QList<RecurringRule> result;
+    while (query.next())
+        result.append(ruleFromQuery(query));
+    rules = result;
+    return true;
+}
+
+bool Database::processRecurring(const QString &today, int &created)
+{
+    m_lastError.clear();
+    created = 0;
+    if (!isOpen()) {
+        m_lastError = QStringLiteral("Database is not open");
+        return false;
+    }
+    if (!isValidIsoDate(today)) {
+        m_lastError = QStringLiteral("Date must be a valid ISO date (YYYY-MM-DD)");
+        return false;
+    }
+    const QDate now = QDate::fromString(today, Qt::ISODate);
+
+    // All occurrences of all due rules are created in one SQL transaction.
+    if (!m_db.transaction()) {
+        m_lastError = QStringLiteral("Failed to start transaction: ") + m_db.lastError().text();
+        return false;
+    }
+    QList<RecurringRule> due;
+    {
+        QSqlQuery select(m_db);
+        select.prepare(QStringLiteral("SELECT ") + QLatin1String(kRecurringColumns) +
+                       QStringLiteral(" FROM Recurring WHERE Active = 1 AND Next_Date <= ? "
+                                      "AND (End_Date = '' OR Next_Date <= End_Date) ORDER BY ID_Recurring"));
+        select.addBindValue(today);
+        if (!select.exec()) {
+            setQueryError(m_lastError, QStringLiteral("Failed to read due recurring rules"), select);
+            return rollbackWithError(m_db, m_lastError);
+        }
+        while (select.next())
+            due.append(ruleFromQuery(select));
+    }
+
+    int total = 0;
+    for (const RecurringRule &rule : due) {
+        const QDate start = QDate::fromString(rule.startDate, Qt::ISODate);
+        const QDate end = rule.endDate.isEmpty() ? QDate() : QDate::fromString(rule.endDate, Qt::ISODate);
+        qint64 n = rule.generated;
+        QDate next = QDate::fromString(rule.nextDate, Qt::ISODate);
+        int count = 0;
+        while (next.isValid() && next <= now && (!end.isValid() || next <= end) && count < 2000) {
+            QSqlQuery insert(m_db);
+            insert.prepare(QStringLiteral(
+                "INSERT INTO Transactions (Amount, Date, Type, ID_Category, ID_Account, Note) "
+                "VALUES (?, ?, ?, ?, ?, ?)"));
+            insert.addBindValue(rule.amount);
+            insert.addBindValue(next.toString(Qt::ISODate));
+            insert.addBindValue(transactionType(rule.isIncome));
+            insert.addBindValue(rule.categoryId);
+            insert.addBindValue(rule.accountId);
+            insert.addBindValue(storedNote(rule.note));
+            if (!insert.exec()) {
+                setQueryError(m_lastError, QStringLiteral("Failed to create recurring transaction"), insert);
+                return rollbackWithError(m_db, m_lastError);
+            }
+            if (!adjustAccountBalance(m_db, rule.accountId, signedAmount(rule.amount, rule.isIncome),
+                                      m_lastError)) {
+                return rollbackWithError(m_db, m_lastError);
+            }
+            ++count;
+            next = occurrenceDate(start, rule.frequency, rule.interval, ++n);
+        }
+        QSqlQuery update(m_db);
+        update.prepare(QStringLiteral("UPDATE Recurring SET Generated = ?, Next_Date = ? WHERE ID_Recurring = ?"));
+        update.addBindValue(static_cast<int>(n));
+        update.addBindValue(next.toString(Qt::ISODate));
+        update.addBindValue(rule.id);
+        if (!update.exec()) {
+            setQueryError(m_lastError, QStringLiteral("Failed to advance recurring rule"), update);
+            return rollbackWithError(m_db, m_lastError);
+        }
+        total += count;
+    }
+    if (!m_db.commit()) {
+        m_lastError = QStringLiteral("Failed to commit recurring transactions: ") + m_db.lastError().text();
+        return rollbackWithError(m_db, m_lastError);
+    }
+    created = total;
     return true;
 }
