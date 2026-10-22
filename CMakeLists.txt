@@ -12,13 +12,26 @@ qt_standard_project_setup()
 qt_add_executable(ExpenseTracker
     src/main.cpp
     src/MainWindow.cpp
-    src/TransactionDialog.cpp
+    src/ChartWidgets.cpp
+    src/TransactionForm.cpp
+    src/RecurringForm.cpp
+    src/Popup.cpp
+    src/Theme.cpp
+    src/Logo.cpp
     src/Database.cpp
     src/ExpenseManager.cpp
     src/Transaction.cpp
     src/Statistics.cpp
     include/MainWindow.h
-    include/TransactionDialog.h
+    include/ChartWidgets.h
+    include/Format.h
+    include/TransactionForm.h
+    include/RecurringForm.h
+    include/Recurring.h
+    include/Popup.h
+    include/Theme.h
+    include/Logo.h
+    include/Transfer.h
     include/Database.h
     include/ExpenseManager.h
     include/Statistics.h
@@ -58,4 +71,15 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME DatabaseTests COMMAND DatabaseTests)
+
+    add_executable(FeatureTests
+        tests/FeatureTests.cpp
+        src/Database.cpp
+        src/ExpenseManager.cpp
+        src/Transaction.cpp
+        src/Statistics.cpp
+    )
+    target_include_directories(FeatureTests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_link_libraries(FeatureTests PRIVATE Qt6::Sql)
+    add_test(NAME FeatureTests COMMAND FeatureTests)
 endif()

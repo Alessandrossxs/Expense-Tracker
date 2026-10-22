@@ -2,23 +2,23 @@
 
 #include "Transaction.h"
 
-#include <QDialog>
 #include <QList>
 #include <QVariantMap>
+#include <QWidget>
 
 class QComboBox;
 class QDateEdit;
 class QDoubleSpinBox;
+class QLineEdit;
 
-class TransactionDialog : public QDialog
+// Fields of the add/edit transaction popup (no buttons: Popup provides them).
+class TransactionForm : public QWidget
 {
 public:
-    explicit TransactionDialog(
-        const QList<QVariantMap> &categories,
-        int accountId,
-        QWidget *parent = nullptr);
+    TransactionForm(const QList<QVariantMap> &categories, int accountId, QWidget *parent = nullptr);
     void setTransaction(const Transaction &transaction);
     Transaction transaction() const;
+    QString validate() const; // empty when the form is valid
 
 private:
     QList<QVariantMap> m_categories;
@@ -28,5 +28,6 @@ private:
     QComboBox *m_category = nullptr;
     QDateEdit *m_date = nullptr;
     QDoubleSpinBox *m_amount = nullptr;
+    QLineEdit *m_note = nullptr;
     void reloadCategories(int preferredCategory = 0);
 };

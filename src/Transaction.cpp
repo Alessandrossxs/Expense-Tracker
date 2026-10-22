@@ -6,13 +6,15 @@ Transaction::Transaction(
     int categoryId,
     const QString &date,
     qint64 amount,
-    bool isIncome)
+    bool isIncome,
+    const QString &note)
     : m_id(id),
       m_accountId(accountId),
       m_categoryId(categoryId),
       m_date(date),
       m_amount(amount),
-      m_isIncome(isIncome)
+      m_isIncome(isIncome),
+      m_note(note)
 {
 }
 
@@ -74,4 +76,14 @@ void Transaction::setAmount(qint64 amount)
 void Transaction::setIncome(bool isIncome)
 {
     m_isIncome = isIncome;
+}
+
+QString Transaction::getNote() const
+{
+    return m_note;
+}
+
+void Transaction::setNote(const QString &note)
+{
+    m_note = note;
 }

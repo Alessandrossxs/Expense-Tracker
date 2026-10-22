@@ -4,13 +4,20 @@ A C++ application for managing personal income and expenses, tracking financial 
 
 ## Features
 
-- Qt desktop interface with three pages: **Panoramica** (dashboard), **Transazioni**, and **Categorie**
-- Dashboard with current balance, total income, total expenses, this month's expenses, and recent transactions
-- Add, edit, and delete transactions
-- Organize transactions by category (default categories are created on first launch; new ones can be added from the UI)
-- Filter transactions by date range, category, and amount range
-- Store accounts, categories, transactions, and balances in SQLite
-- Export filtered transaction data to CSV
+- Qt desktop interface with six pages: **Panoramica**, **Transazioni**, **Categorie**, **Ricorrenti**, **Conti**, and **Aspetto**
+- Dashboard with current balance, total income, total expenses, this month's expenses, a spending-by-category chart, a 6-month income/expense chart, and the latest transactions
+- Multiple accounts, switchable from the sidebar; create, rename, delete (empty accounts only) and set each account's initial balance
+- Transfers between accounts, kept apart from income and expenses so they never count as earnings or spending
+- Recurring incomes and expenses (daily, weekly, monthly, yearly, every N periods, optional end date): due transactions are created automatically, including those missed while the app was closed; rules can be paused, edited and deleted
+- Add, edit, and delete transactions, each with an optional note
+- Sortable transaction table (click a column header) with a totals line for the filtered list
+- Filter by period (all, this month, last 30 days, this year, custom range), category, and amount range; filters apply instantly
+- Add, rename, and delete categories (a category in use cannot be deleted; duplicate names are rejected)
+- **Aspetto** page: pick the application color (presets or any `#RRGGBB`) and light/dark mode; backgrounds, buttons, selections and charts follow, and the choice is remembered
+- Forms and confirmations open as in-app popups, with short notifications instead of extra windows
+- Keyboard shortcuts: `Ctrl+N` new transaction, `Enter` edit, `Del` delete
+- Store accounts, categories, transactions, transfers, and balances in SQLite
+- Export filtered transaction data of the active account to CSV (`transaction_id,account_id,category_id,date,type,amount_cents,note`; transfers are not included)
 
 ## Technologies
 
@@ -57,10 +64,13 @@ Run the application from the directory where you want the data to live:
 ./build/ExpenseTracker
 ```
 
-On first launch the app creates a SQLite database named `expense_tracker.db`
-in the **current working directory**, together with a default account and a set
-of default categories. Launching it from a different directory creates or opens
-a different database. The `.db` file is ignored by Git.
+On first launch the app creates a SQLite database named `expense_tracker.db` in
+the per-user application data folder (for example
+`%APPDATA%\Alessandro\Expense Tracker` on Windows), together with a default
+account and default categories. If a
+database named `expense_tracker.db` exists in the directory you launch the app
+from (older versions stored it there), it is copied to the new location on the
+first run. Databases created by earlier versions are upgraded automatically.
 
 ## Amounts, accounts, and filters
 

@@ -2,58 +2,139 @@
 
 #include "ExpenseManager.h"
 
-#include <QMainWindow>
+#include <QColor>
 #include <QList>
+#include <QMainWindow>
 #include <QVariantMap>
 
-class QLabel;
 class QComboBox;
 class QDateEdit;
 class QDoubleSpinBox;
+class QLabel;
+class QLineEdit;
+class QPushButton;
 class QStackedWidget;
 class QTableWidget;
+class QTimer;
 class QWidget;
+class DonutChart;
+class MonthlyBarChart;
 
 class MainWindow : public QMainWindow
 {
 public:
-    explicit MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(const QString &databasePath, QWidget *parent = nullptr);
 
 private:
+    struct RowRef
+    {
+        int id = 0;
+        bool transfer = false;
+    };
+
     ExpenseManager m_manager;
+    QString m_databasePath;
     int m_accountId = 0;
+    bool m_darkTheme = false;
+    QColor m_accent;
     QList<QVariantMap> m_categories;
+    QList<QVariantMap> m_accounts;
+    QList<Transaction> m_visibleTransactions;
 
     QStackedWidget *m_pages = nullptr;
-    QTableWidget *m_recentTable = nullptr;
-    QTableWidget *m_transactionsTable = nullptr;
-    QTableWidget *m_categoriesTable = nullptr;
+    QList<QPushButton *> m_navButtons;
+    QComboBox *m_accountCombo = nullptr;
+    QLabel *m_logoLabel = nullptr;
+    QLabel *m_toast = nullptr;
+    QTimer *m_toastTimer = nullptr;
+    // Dashboard
+    QLabel *m_dashSubtitle = nullptr;
     QLabel *m_balanceValue = nullptr;
     QLabel *m_incomeValue = nullptr;
     QLabel *m_expensesValue = nullptr;
     QLabel *m_monthValue = nullptr;
+    DonutChart *m_donut = nullptr;
+    MonthlyBarChart *m_bars = nullptr;
+    QTableWidget *m_recentTable = nullptr;
+    QStackedWidget *m_recentStack = nullptr;
+    // Transactions
+    QTableWidget *m_transactionsTable = nullptr;
+    QStackedWidget *m_transactionsStack = nullptr;
+    QLabel *m_transactionsEmpty = nullptr;
+    QLabel *m_transactionsSummary = nullptr;
+    QComboBox *m_filterPeriod = nullptr;
     QComboBox *m_filterCategory = nullptr;
+    QWidget *m_customRange = nullptr;
     QDateEdit *m_filterFrom = nullptr;
     QDateEdit *m_filterTo = nullptr;
     QDoubleSpinBox *m_filterMin = nullptr;
     QDoubleSpinBox *m_filterMax = nullptr;
+    QLabel *m_filterHint = nullptr;
+    // Categories, accounts, appearance
+    QTableWidget *m_categoriesTable = nullptr;
+    QTableWidget *m_accountsTable = nullptr;
+    QLabel *m_totalValue = nullptr;
+    QTableWidget *m_recurringTable = nullptr;
+    QStackedWidget *m_recurringStack = nullptr;
+    QTimer *m_recurringTimer = nullptr;
+    QList<RecurringRule> m_rules;
+    QList<QPushButton *> m_swatches;
+    QPushButton *m_lightButton = nullptr;
+    QPushButton *m_darkButton = nullptr;
+    QLineEdit *m_hexEdit = nullptr;
+    QLabel *m_hexHint = nullptr;
 
     bool initializeData();
     void buildUi();
     QWidget *buildDashboardPage();
     QWidget *buildTransactionsPage();
     QWidget *buildCategoriesPage();
+    QWidget *buildRecurringPage();
+    QWidget *buildAccountsPage();
+    QWidget *buildAppearancePage();
+    void applyTheme();
+    void setAccent(const QColor &color);
+    void setDarkTheme(bool dark);
+    void syncAppearanceControls();
+    void showPage(int index);
+    void showToast(const QString &text);
+    void showError(const QString &message);
+
     void refreshAll();
+    void refreshAccounts();
     void refreshDashboard();
     void refreshTransactions();
     void refreshCategories();
+    void refreshRecurring();
+    void fillTransactionRow(QTableWidget *table, int row, const Transaction &t) const;
+    void fillTransferRow(QTableWidget *table, int row, const Transfer &t) const;
     TransactionFilter currentFilter() const;
+    QString filterProblem() const;
+    bool filterIsActive() const;
     QString categoryName(int categoryId) const;
-    QString money(qint64 cents) const;
+    QString accountName(int accountId) const;
+    RowRef selectedTransactionRow() const;
+    int selectedCategoryId() const;
+    int selectedAccountId() const;
+    int selectedRecurringId() const;
+    bool categoryNameTaken(const QString &name, const QString &type, int excludeId) const;
+
     void addTransaction();
     void editTransaction();
     void deleteTransaction();
     void exportCsv();
     void addCategory();
-    void showError(const QString &message);
+    void renameCategory();
+    void deleteCategory();
+    void addAccount();
+    void renameAccount();
+    void deleteAccount();
+    void setInitialBalance(int accountId);
+    void addTransfer();
+    void addRecurring();
+    void editRecurring();
+    void toggleRecurring();
+    void deleteRecurring();
+    int processRecurring(bool announce = true);
+    void switchAccount(int accountId);
 };
