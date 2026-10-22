@@ -44,6 +44,7 @@ private:
     QStackedWidget *m_pages = nullptr;
     QList<QPushButton *> m_navButtons;
     QComboBox *m_accountCombo = nullptr;
+    QLabel *m_logoLabel = nullptr;
     QLabel *m_toast = nullptr;
     QTimer *m_toastTimer = nullptr;
     // Dashboard
@@ -51,6 +52,7 @@ private:
     QLabel *m_balanceValue = nullptr;
     QLabel *m_incomeValue = nullptr;
     QLabel *m_expensesValue = nullptr;
+    QLabel *m_monthValue = nullptr;
     DonutChart *m_donut = nullptr;
     MonthlyBarChart *m_bars = nullptr;
     QTableWidget *m_recentTable = nullptr;

@@ -17,6 +17,7 @@ qt_add_executable(ExpenseTracker
     src/RecurringForm.cpp
     src/Popup.cpp
     src/Theme.cpp
+    src/Logo.cpp
     src/Database.cpp
     src/ExpenseManager.cpp
     src/Transaction.cpp
@@ -29,6 +30,7 @@ qt_add_executable(ExpenseTracker
     include/Recurring.h
     include/Popup.h
     include/Theme.h
+    include/Logo.h
     include/Transfer.h
     include/Database.h
     include/ExpenseManager.h

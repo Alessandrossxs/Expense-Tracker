@@ -1,3 +1,4 @@
+#include "Logo.h"
 #include "MainWindow.h"
 
 #include <QApplication>
@@ -34,6 +35,8 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationName(QStringLiteral("Expense Tracker"));
     QCoreApplication::setOrganizationName(QStringLiteral("Alessandro"));
 
+    app.setWindowIcon(appIcon(QColor(QStringLiteral("#6658d3"))));
+
     // Prefer Segoe UI, but fall back gracefully on macOS and Linux.
     QFont font = app.font();
     font.setFamilies({QStringLiteral("Segoe UI"), QStringLiteral("SF Pro Text"),
@@ -42,6 +45,6 @@ int main(int argc, char *argv[])
     app.setFont(font);
 
     MainWindow window(resolveDatabasePath());
-    window.show();
+    window.showMaximized(); // fills the screen; the title bar and taskbar stay available
     return app.exec();
 }

@@ -7,7 +7,6 @@
 #include <QtMath>
 
 #include <algorithm>
-#include <cmath>
 
 namespace
 {
@@ -18,16 +17,12 @@ QColor gridColor(bool dark) { return QColor(dark ? "#2a2e45" : "#e7eaf1"); }
 const QColor kIncomeColor(QStringLiteral("#16845b"));
 const QColor kExpenseColor(QStringLiteral("#d94d64"));
 
-QColor sliceColor(int index, bool other, const QColor &accent, bool dark)
+QColor sliceColor(int index, bool other, const QColor &accent)
 {
-    qreal hue = accent.hslHueF();
-    if (hue < 0)
-        hue = 0;
-    const qreal saturation = other ? 0.22 : 0.78;
-    const qreal lightness = other ? (dark ? 0.68 : 0.50) : (dark ? 0.68 : 0.48);
-    if (!other)
-        hue = std::fmod(hue + index * 72.0 / 360.0, 1.0);
-    return QColor::fromHslF(hue, saturation, lightness);
+    if (index == 0 && !other)
+        return accent;
+    static const char *palette[] = {"#6658d3", "#2fa37c", "#e8a33d", "#d94d64", "#3b9ae1"};
+    return other ? QColor(QStringLiteral("#9aa3b8")) : QColor(QLatin1String(palette[index % 5]));
 }
 
 void drawCentered(QPainter &p, const QRect &r, const QString &text, const QColor &color)
@@ -79,7 +74,7 @@ void DonutChart::paintEvent(QPaintEvent *)
     for (int i = 0; i < m_slices.size(); ++i) {
         accumulated += m_slices.at(i).value;
         const int end = 90 * 16 - qRound(360.0 * 16.0 * double(accumulated) / double(total));
-        QPen pen(sliceColor(i, m_slices.at(i).other, m_accent, m_dark), ringWidth);
+        QPen pen(sliceColor(i, m_slices.at(i).other, m_accent), ringWidth);
         pen.setCapStyle(Qt::FlatCap);
         p.setPen(pen);
         p.drawArc(arc, start, end - start);
@@ -108,7 +103,7 @@ void DonutChart::paintEvent(QPaintEvent *)
     for (int i = 0; i < count; ++i, y += rowH) {
         const DonutSlice &s = m_slices.at(i);
         p.setPen(Qt::NoPen);
-        p.setBrush(sliceColor(i, s.other, m_accent, m_dark));
+        p.setBrush(sliceColor(i, s.other, m_accent));
         p.drawRoundedRect(QRect(x0, y + rowH / 2 - 5, 10, 10), 3, 3);
         const int valueW = fm.horizontalAdvance(s.valueText);
         const QRect valueRect(right - valueW, y, valueW, rowH);

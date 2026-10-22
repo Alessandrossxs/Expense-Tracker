@@ -2,6 +2,7 @@
 
 #include "ChartWidgets.h"
 #include "Format.h"
+#include "Logo.h"
 #include "Popup.h"
 #include "RecurringForm.h"
 #include "Theme.h"
@@ -333,6 +334,9 @@ bool MainWindow::initializeData()
 void MainWindow::applyTheme()
 {
     setStyleSheet(buildStyleSheet(m_accent, m_darkTheme));
+    setWindowIcon(appIcon(m_accent));
+    if (m_logoLabel)
+        m_logoLabel->setPixmap(logoPixmap(42, m_accent));
     const QColor accent = effectiveAccent(m_accent, m_darkTheme);
     if (m_donut) {
         m_donut->setDarkMode(m_darkTheme);
@@ -399,10 +403,34 @@ void MainWindow::buildUi()
     auto *sideLayout = new QVBoxLayout(sidebar);
     sideLayout->setContentsMargins(16, 22, 16, 20);
     sideLayout->setSpacing(6);
-    auto *brand = new QLabel(QStringLiteral("◈  Expense Tracker"), sidebar);
-    brand->setObjectName(QStringLiteral("brand"));
-    sideLayout->addWidget(brand);
+    auto *brandRow = new QWidget(sidebar);
+    brandRow->setObjectName(QStringLiteral("transparentBox"));
+    auto *brandLayout = new QHBoxLayout(brandRow);
+    brandLayout->setContentsMargins(2, 8, 2, 18);
+    brandLayout->setSpacing(12);
+    m_logoLabel = new QLabel(brandRow);
+    m_logoLabel->setFixedSize(42, 42);
+    brandLayout->addWidget(m_logoLabel);
+    auto *brandNames = new QVBoxLayout;
+    brandNames->setContentsMargins(0, 0, 0, 0);
+    brandNames->setSpacing(0);
+    auto *brandTitle = new QLabel(tr("Expense"), brandRow);
+    brandTitle->setObjectName(QStringLiteral("brandTitle"));
+    auto *brandSubtitle = new QLabel(tr("TRACKER"), brandRow);
+    brandSubtitle->setObjectName(QStringLiteral("brandSubtitle"));
+    QFont spaced = brandSubtitle->font();
+    spaced.setLetterSpacing(QFont::AbsoluteSpacing, 3.0);
+    brandSubtitle->setFont(spaced);
+    brandNames->addWidget(brandTitle);
+    brandNames->addWidget(brandSubtitle);
+    brandLayout->addLayout(brandNames, 1);
+    sideLayout->addWidget(brandRow);
 
+    auto *caption = new QLabel(tr("CONTO ATTIVO"), sidebar);
+    caption->setObjectName(QStringLiteral("sidebarCaption"));
+    sideLayout->addWidget(caption);
+    m_accountCombo = new QComboBox(sidebar);
+    sideLayout->addWidget(m_accountCombo);
     sideLayout->addSpacing(14);
 
     m_pages = new QStackedWidget(root);
@@ -494,24 +522,18 @@ QWidget *MainWindow::buildDashboardPage()
     m_dashSubtitle = subTitle(QString(), page);
     titles->addWidget(m_dashSubtitle);
     header->addLayout(titles, 1);
+    auto *initial = button(tr("Saldo iniziale…"), "secondaryButton", page,
+                           tr("Imposta il saldo di partenza del conto attivo"));
+    header->addWidget(initial, 0, Qt::AlignTop);
     layout->addLayout(header);
+    connect(initial, &QPushButton::clicked, this, [this] { setInitialBalance(m_accountId); });
 
     auto *metrics = new QHBoxLayout;
     metrics->setSpacing(14);
-    auto *accountCard = new QFrame(page);
-    accountCard->setObjectName(QStringLiteral("metricCard"));
-    auto *accountLayout = new QVBoxLayout(accountCard);
-    accountLayout->setContentsMargins(20, 18, 20, 18);
-    accountLayout->setSpacing(8);
-    auto *accountCaption = new QLabel(tr("Selezione conto"), accountCard);
-    accountCaption->setObjectName(QStringLiteral("metricCaption"));
-    m_accountCombo = new QComboBox(accountCard);
-    accountLayout->addWidget(accountCaption);
-    accountLayout->addWidget(m_accountCombo);
-    metrics->addWidget(accountCard, 1);
     metrics->addWidget(metricCard(tr("Saldo attuale"), &m_balanceValue, page), 1);
-    metrics->addWidget(metricCard(tr("Entrate mese"), &m_incomeValue, page), 1);
-    metrics->addWidget(metricCard(tr("Uscite mese"), &m_expensesValue, page), 1);
+    metrics->addWidget(metricCard(tr("Entrate totali"), &m_incomeValue, page), 1);
+    metrics->addWidget(metricCard(tr("Uscite totali"), &m_expensesValue, page), 1);
+    metrics->addWidget(metricCard(tr("Uscite del mese"), &m_monthValue, page), 1);
     layout->addLayout(metrics);
 
     auto *charts = new QHBoxLayout;
@@ -969,7 +991,7 @@ void MainWindow::refreshAccounts()
         m_accountsTable->setItem(row, 1, cell(formatMoney(account.value(QStringLiteral("Initial_Credit")).toLongLong()),
                                               Qt::AlignVCenter | Qt::AlignRight));
         auto *balance = cell(formatMoney(credit), Qt::AlignVCenter | Qt::AlignRight);
-        balance->setForeground(QColor(credit < 0 ? QStringLiteral("#d94d64") : QStringLiteral("#ffffff")));
+        balance->setForeground(QColor(credit < 0 ? QStringLiteral("#d94d64") : QString()));
         m_accountsTable->setItem(row, 2, balance);
     }
     m_totalValue->setText(formatMoney(total));
@@ -1029,8 +1051,10 @@ void MainWindow::fillTransferRow(QTableWidget *table, int row, const Transfer &t
 void MainWindow::refreshDashboard()
 {
     m_dashSubtitle->setText(tr("Conto «%1» · un riepilogo chiaro delle tue finanze.").arg(accountName(m_accountId)));
+    Statistics totals;
     qint64 balance = 0;
-    if (!m_manager.getAccountBalance(m_accountId, balance)) {
+    if (!m_manager.getStatistics(m_accountId, totals) ||
+        !m_manager.getAccountBalance(m_accountId, balance)) {
         showError(m_manager.lastError());
         return;
     }
@@ -1054,8 +1078,9 @@ void MainWindow::refreshDashboard()
     }
 
     m_balanceValue->setText(formatMoney(balance));
-    m_incomeValue->setText(formatMoney(monthTotals.getTotalIncome()));
-    m_expensesValue->setText(formatMoney(monthTotals.getTotalExpenses()));
+    m_incomeValue->setText(formatMoney(totals.getTotalIncome()));
+    m_expensesValue->setText(formatMoney(totals.getTotalExpenses()));
+    m_monthValue->setText(formatMoney(monthTotals.getTotalExpenses()));
     m_balanceValue->setStyleSheet(
         QStringLiteral("color:%1;").arg(balance < 0 ? QStringLiteral("#d94d64")
                                                     : effectiveAccent(m_accent, m_darkTheme).name()));

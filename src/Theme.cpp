@@ -106,6 +106,8 @@ QString buildStyleSheet(const QColor &chosen, bool dark)
 
         QFrame#sidebar { background: {{sidebar}}; border: none; }
         QLabel#brand { color: #ffffff; font-size: 12pt; font-weight: 700; padding: 12px 4px 16px 4px; }
+        QLabel#brandTitle { color: #ffffff; font-size: 15pt; font-weight: 700; }
+        QLabel#brandSubtitle { color: {{navText}}; font-size: 8pt; font-weight: 700; }
         QLabel#sidebarCaption { color: {{navText}}; font-size: 8pt; font-weight: 700; padding: 4px 2px 0 2px; }
         QLabel#sidebarFooter { color: {{navText}}; padding: 8px; }
         QFrame#sidebar QComboBox { background: {{navHover}}; color: #ffffff; border: 1px solid {{navHover}}; }
